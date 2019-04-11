@@ -1,12 +1,33 @@
 package main
 
 import (
-	evp "frontend/eventpool"
-	ls "frontend/listener"
+	"log"
+	"sync"
+
+	ac "github.com/halivor/frontend/acceptor"
+	ag "github.com/halivor/frontend/agent"
+	evp "github.com/halivor/frontend/eventpool"
+	m "github.com/halivor/frontend/middleware"
 )
 
+var wg sync.WaitGroup
+
 func main() {
+	wg.Add(1)
+	go newFrontEnd()
+	wg.Wait()
+}
+
+func newFrontEnd() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println(r)
+		}
+	}()
+	mw := m.New()
 	ep := evp.New()
-	ls.NewTcpListener("0.0.0.0:19981", ep)
+	ac.NewTcpAcceptor("0.0.0.0:19981", ep, mw)
+	ag.New("127.0.0.1:9981", ep, mw)
 	ep.Run()
+	wg.Done()
 }

@@ -1,7 +1,6 @@
 package connection
 
 import (
-	"container/list"
 	"fmt"
 	"log"
 	"os"
@@ -11,8 +10,8 @@ import (
 type C struct {
 	fd int
 	*log.Logger
-	rl *list.List
-	wl *list.List
+	rb []byte
+	wl [][]byte
 }
 
 type Sock interface {
@@ -23,8 +22,8 @@ func NewSock(fd int) *C {
 	return &C{
 		fd:     fd,
 		Logger: log.New(os.Stderr, fmt.Sprintf("[tcp(%d)] ", fd), log.LstdFlags|log.Lmicroseconds),
-		rl:     list.New(),
-		wl:     list.New(),
+		rb:     make([]byte, 4096),
+		wl:     make([][]byte, 0),
 	}
 }
 
@@ -36,9 +35,21 @@ func NewTcp() *C {
 	return &C{
 		fd:     fd,
 		Logger: log.New(os.Stderr, fmt.Sprintf("[tcp(%d)] ", fd), log.LstdFlags|log.Lmicroseconds),
-		rl:     list.New(),
-		wl:     list.New(),
+		rb:     make([]byte, 4096),
+		wl:     make([][]byte, 0),
 	}
+}
+
+func (c *C) SendAgain() {
+}
+
+func (c *C) Send(message []byte) {
+}
+
+func (c *C) Recv() {
+}
+
+func (c *C) Close() {
 }
 
 func (c *C) Fd() int {

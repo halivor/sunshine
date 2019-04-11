@@ -1,4 +1,4 @@
-package client
+package peer
 
 // message type :
 // b - binary

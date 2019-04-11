@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"frontend/config"
+	"github.com/halivor/frontend/config"
 )
 
 type EventPool interface {
