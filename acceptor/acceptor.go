@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	c "github.com/halivor/frontend/connection"
-	evp "github.com/halivor/frontend/eventpool"
+	e "github.com/halivor/frontend/eventpool"
 	m "github.com/halivor/frontend/middleware"
 	p "github.com/halivor/frontend/peer"
 )
@@ -18,26 +18,16 @@ type Acceptor struct {
 	addr string
 
 	*c.C
-	evp.EventPool // event: add, del, mod
-	p.Manage      // event: unicast, broadcast
-	m.Middleware
+	e.EventPool // event: add, del, mod
+	p.Manager
 
 	*log.Logger
 }
 
-func NewTcpAcceptors(addrs []string, ep evp.EventPool, mw m.Middleware) []*Acceptor {
-	a := make([]*Acceptor, 0)
-	for _, addr := range addrs {
-		a = append(a, NewTcpAcceptor(addr, ep, mw))
-	}
-	return a
-}
-
-func NewTcpAcceptor(addr string, ep evp.EventPool, mw m.Middleware) (a *Acceptor) {
+func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor) {
 	defer func() {
 		a.Println("add event")
 		a.AddEvent(a)
-		a.Register(m.C_PEER, a)
 	}()
 	c := c.NewTcp()
 	ad, e := net.ResolveTCPAddr("tcp", addr)
@@ -54,30 +44,32 @@ func NewTcpAcceptor(addr string, ep evp.EventPool, mw m.Middleware) (a *Acceptor
 		log.Panicln(err.Error())
 	}
 	return &Acceptor{
-		ev:   syscall.EPOLLIN,
-		addr: addr,
-
+		ev:        syscall.EPOLLIN,
+		addr:      addr,
 		C:         c,
 		EventPool: ep,
-		Manage:    p.NewManager(),
-
-		Logger: log.New(os.Stderr, fmt.Sprintf("[lsn(%d)] ", c.Fd()), log.LstdFlags|log.Lmicroseconds),
+		Manager:   p.NewManager(mw),
+		Logger:    log.New(os.Stderr, fmt.Sprintf("[lsn(%d)] ", c.Fd()), log.LstdFlags|log.Lmicroseconds),
 	}
 }
 
+// TODO: 细化异常处理流程
 func (a *Acceptor) CallBack(ev uint32) {
 	if ev&syscall.EPOLLERR != 0 {
 		a.Println("epoll error", ev)
 		a.DelEvent(a)
 		return
 	}
-	fd, _, e := syscall.Accept(a.Fd())
-	a.Println("accept connection", fd)
-	if e == nil {
-		a.AddEvent(p.New(c.NewSock(fd), a.EventPool, a.Manage))
-		return
+	switch fd, _, e := syscall.Accept(a.Fd()); e {
+	case syscall.EAGAIN, syscall.EINTR:
+	case nil:
+		a.Println("accept connection", fd)
+		a.AddEvent(p.New(c.NewSock(fd), a.EventPool, a.Manager))
+	default:
+		a.Println(e)
+		a.DelEvent(a)
+		// TODO: 释放并重启acceptor
 	}
-	a.Println(e)
 }
 
 func (a *Acceptor) Event() uint32 {

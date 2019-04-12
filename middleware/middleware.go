@@ -1,39 +1,49 @@
 package middleware
 
 type Middleware interface {
-	Register(ctg Category, i interface{}) bool
+	Bind(category string, a Action, i interface{}) TypeID
+	Produce(id TypeID, message interface{})
 }
 
 type middleware struct {
-	category map[Category]interface{}
+	category map[TypeID][]Consume
 }
 
 func New() *middleware {
 	return &middleware{
-		category: make(map[Category]interface{}),
+		category: make(map[TypeID][]Consume),
 	}
 }
 
-func (m *middleware) Register(ctg Category, i interface{}) bool {
-	if !ctg.check(i) {
-		return false
+func (m *middleware) Bind(category string, a Action, i interface{}) TypeID {
+	if _, ok := tId[category]; !ok {
+		id++
+		tId[category] = id
 	}
-	m.category[ctg] = i
-	return true
-}
-
-func (m *middleware) Unicast(ctg Category, id uint64, message interface{}) {
-	if c, ok := m.category[ctg]; ok {
-		if i, ok := c.(Unicast); ok {
-			i.Unicast(id, message)
+	id := tId[category]
+	switch a {
+	case A_PRODUCER:
+		if _, ok := m.category[id]; !ok {
+			m.category[id] = make([]Consume, 0, MAX_CONSUMER)
+		}
+	case A_CONSUMER:
+		if cs, ok := m.category[id]; ok {
+			if consumer, ok := i.(Consume); ok {
+				m.category[id] = append(cs, consumer)
+			}
+		} else {
+			if consumer, ok := i.(Consume); ok {
+				m.category[id] = append(make([]Consume, 0, MAX_CONSUMER), consumer)
+			}
 		}
 	}
+	return id
 }
 
-func (m *middleware) Broadcast(ctg Category, message interface{}) {
-	if c, ok := m.category[ctg]; ok {
-		if i, ok := c.(Broadcast); ok {
-			i.Broadcast(message)
+func (m *middleware) Produce(id TypeID, message interface{}) {
+	if cs, ok := m.category[id]; ok {
+		for _, c := range cs {
+			c.Consume(message)
 		}
 	}
 }

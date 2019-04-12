@@ -5,25 +5,43 @@ import (
 	"log"
 	"os"
 	"syscall"
+
+	bp "github.com/halivor/frontend/bufferpool"
 )
 
-type C struct {
-	fd int
-	*log.Logger
-	rb []byte
-	wl [][]byte
+const (
+	MAX_SENDQ_SIZE = 32
+)
+
+type Conn interface {
+	Fd() int
+	SendAgain() error
+	Send(message []byte) error
+	Recv()
+	Close()
 }
 
-type Sock interface {
-	Fd() int
+type packet struct {
+	buf []byte
+	pos int
+}
+
+type C struct {
+	stat bool
+	fd   int
+	rb   []byte
+	wl   []*packet
+
+	*log.Logger
 }
 
 func NewSock(fd int) *C {
 	return &C{
 		fd:     fd,
+		stat:   true,
+		rb:     bp.Alloc(),
+		wl:     make([]*packet, MAX_SENDQ_SIZE),
 		Logger: log.New(os.Stderr, fmt.Sprintf("[tcp(%d)] ", fd), log.LstdFlags|log.Lmicroseconds),
-		rb:     make([]byte, 4096),
-		wl:     make([][]byte, 0),
 	}
 }
 
@@ -36,14 +54,47 @@ func NewTcp() *C {
 		fd:     fd,
 		Logger: log.New(os.Stderr, fmt.Sprintf("[tcp(%d)] ", fd), log.LstdFlags|log.Lmicroseconds),
 		rb:     make([]byte, 4096),
-		wl:     make([][]byte, 0),
+		wl:     make([]*packet, 0),
 	}
 }
 
-func (c *C) SendAgain() {
+func (c *C) SendAgain() error {
+	for {
+		if len(c.wl) > 0 {
+			switch n, e := syscall.Write(c.fd, c.wl[0].buf[c.wl[0].pos:]); e {
+			case syscall.EAGAIN:
+				c.wl[0].pos += n
+			case nil:
+				if n == len(c.wl[0].buf[c.wl[0].pos:]) {
+					bp.Release(c.wl[0].buf)
+					c.wl = c.wl[1:]
+				} else {
+					c.wl[0].pos += n
+				}
+			}
+		}
+	}
+	return nil
 }
 
-func (c *C) Send(message []byte) {
+func (c *C) Send(message []byte) error {
+	if len(c.wl) > 0 {
+		c.wl = append(c.wl, &packet{
+			buf: message,
+			pos: 0,
+		})
+		return syscall.EAGAIN
+	}
+	n, e := syscall.Write(c.fd, message)
+	if n == len(message) {
+		bp.Release(message)
+	} else {
+		c.wl = append(c.wl, &packet{
+			buf: message,
+			pos: n,
+		})
+	}
+	return e
 }
 
 func (c *C) Recv() {
@@ -54,40 +105,4 @@ func (c *C) Close() {
 
 func (c *C) Fd() int {
 	return c.fd
-}
-
-func (c *C) NonBlock() {
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_TCP, syscall.SOCK_NONBLOCK, 1); e != nil {
-		c.Println(e)
-	}
-}
-
-func (c *C) KeepAlive(idle int) {
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_SOCKET, syscall.SO_KEEPALIVE, 1); e != nil {
-		c.Println(e)
-	}
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_TCP, syscall.TCP_KEEPIDLE, 15); e != nil {
-		c.Println(e)
-	}
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_TCP, syscall.TCP_KEEPINTVL, 5); e != nil {
-		c.Println(e)
-	}
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_TCP, syscall.TCP_KEEPCNT, 3); e != nil {
-		c.Println(e)
-	}
-}
-
-func (c *C) Reuse() {
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); e != nil {
-		c.Println(e)
-	}
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_SOCKET, 15, 1); e != nil {
-		c.Println(e)
-	}
-}
-
-func (c *C) NoDelay() {
-	if e := syscall.SetsockoptInt(c.fd, syscall.SOL_SOCKET, syscall.TCP_NODELAY, 1); e != nil {
-		c.Println(e)
-	}
 }

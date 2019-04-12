@@ -1,8 +1,11 @@
 package peer
 
 import (
+	"fmt"
+	"log"
 	"syscall"
 
+	"github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
 	evp "github.com/halivor/frontend/eventpool"
 )
@@ -10,46 +13,70 @@ import (
 type Peer struct {
 	ev uint32
 	rb []byte
+	ps peerStat
 
-	*c.C
+	c.Conn
 	evp.EventPool
+	Manager
 
-	Manage
+	*log.Logger
 }
 
-func New(C *c.C, ep evp.EventPool, pm Manage) *Peer {
-	if _, ok := pm.(*manager); !ok {
-		return nil
-	}
+func New(conn c.Conn, ep evp.EventPool, pm Manager) *Peer {
 	return &Peer{
 		ev: syscall.EPOLLIN,
 		rb: make([]byte, 4096),
+		ps: PS_ESTAB,
 
-		C:         C,
+		Conn:      conn,
 		EventPool: ep,
+		Manager:   pm.(*manager),
 
-		Manage: pm.(*manager),
+		Logger: config.NewLogger(fmt.Sprint("[peer(%d)]", conn.Fd())),
 	}
 }
 
-func (c *Peer) CallBack(ev uint32) {
+func (p *Peer) CallBack(ev uint32) {
 	switch {
 	case ev&syscall.EPOLLIN != 0:
-		n, e := syscall.Read(c.Fd(), c.rb)
+		n, e := syscall.Read(p.Fd(), p.rb)
 		if e != nil {
-			c.Println(e)
-			c.DelEvent(c)
-			c.Release()
+			p.Println(e)
+			p.DelEvent(p)
+			p.Release()
 			return
 		}
-		c.Println(string(c.rb[:n]))
+		switch p.ps {
+		case PS_ESTAB:
+			p.check(p.rb[:n])
+		case PS_NORMAL:
+		case PS_END:
+		default:
+			p.Produce(p.rb[0:n])
+		}
 	case ev&syscall.EPOLLERR != 0:
+		p.DelEvent(p)
+		p.Release()
 	case ev&syscall.EPOLLOUT != 0:
+		if e := p.SendAgain(); e == nil {
+		}
 	}
 }
 
-func (c *Peer) Event() uint32 {
-	return c.ev
+func (p *Peer) check(message []byte) {
 }
-func (c *Peer) Release() {
+
+func (p *Peer) Event() uint32 {
+	return p.ev
+}
+
+func (p *Peer) Release() {
+}
+
+func (p *Peer) Send(data []byte) {
+	switch e := p.Conn.Send(data); e {
+	case syscall.EAGAIN:
+		p.ev |= syscall.EPOLLOUT
+		p.ModEvent(p)
+	}
 }

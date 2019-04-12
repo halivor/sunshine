@@ -14,6 +14,8 @@ import (
 type Agent struct {
 	ev   uint32
 	addr string
+	mpid m.TypeID
+	mcid m.TypeID
 
 	*c.C
 	evp.EventPool
@@ -26,6 +28,8 @@ func New(addr string, ep evp.EventPool, mw m.Middleware) (a *Agent) {
 	defer func() {
 		a.Println("add event")
 		a.AddEvent(a)
+		a.mpid = a.Bind("down", m.A_PRODUCER, a)
+		a.mcid = a.Bind("up", m.A_CONSUMER, a)
 	}()
 
 	C := c.NewTcp()
