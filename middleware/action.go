@@ -1,18 +1,15 @@
 package middleware
 
+type TypeID int32
+type CategoryID int32
+
 var id TypeID = 't'<<16 | 'i'<<8 | 'd'
 var tId map[string]TypeID
-
-type TypeID uint32
-type Action uint32
 
 // 消息类型
 //		1. transfer
 //		2. verify
 const (
-	A_PRODUCER Action = 1
-	A_CONSUMER Action = 2
-
 	MAX_CONSUMER = 32
 )
 

@@ -1,8 +1,9 @@
 package middleware
 
 type Middleware interface {
-	Bind(category string, a Action, i interface{}) TypeID
-	Produce(id TypeID, message interface{})
+	Bind(id MwId, q string, a Action, c interface{}) TypeID
+	Produce(mwid MwId, qid QId, msg interface{})
+	GetQId(id MwId, q string) QId
 }
 
 type middleware struct {
@@ -15,35 +16,22 @@ func New() *middleware {
 	}
 }
 
-func (m *middleware) Bind(category string, a Action, i interface{}) TypeID {
-	if _, ok := tId[category]; !ok {
-		id++
-		tId[category] = id
+func (m *middleware) GetQId(id MwId, q string) QId {
+	if mw, ok := mws[id]; ok {
+		return mw.GetQId(q)
 	}
-	id := tId[category]
-	switch a {
-	case A_PRODUCER:
-		if _, ok := m.category[id]; !ok {
-			m.category[id] = make([]Consume, 0, MAX_CONSUMER)
-		}
-	case A_CONSUMER:
-		if cs, ok := m.category[id]; ok {
-			if consumer, ok := i.(Consume); ok {
-				m.category[id] = append(cs, consumer)
-			}
-		} else {
-			if consumer, ok := i.(Consume); ok {
-				m.category[id] = append(make([]Consume, 0, MAX_CONSUMER), consumer)
-			}
-		}
-	}
-	return id
+	return -1
 }
 
-func (m *middleware) Produce(id TypeID, message interface{}) {
-	if cs, ok := m.category[id]; ok {
-		for _, c := range cs {
-			c.Consume(message)
-		}
+func (m *middleware) Bind(mwid MwId, q string, a Action, c interface{}) QId {
+	if mw, ok := mws[mwid]; ok {
+		return mw.Bind(q, a, c)
+	}
+	return -1
+}
+
+func (m *middleware) Produce(id MwId, qid QId, msg interface{}) {
+	if mw, ok := mws[id]; ok {
+		mw.Produce(qid, msg)
 	}
 }

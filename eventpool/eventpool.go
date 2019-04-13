@@ -99,7 +99,7 @@ func (m *eventpoll) DelEvent(ev Eventer) error {
 
 func (m *eventpoll) Run() {
 	for {
-		switch n, e := syscall.EpollWait(m.fd, m.ev, 0); e {
+		switch n, e := syscall.EpollWait(m.fd, m.ev, 1000); e {
 		case syscall.EINTR:
 		case nil:
 			for i := 0; i < n; i++ {

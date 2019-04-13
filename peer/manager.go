@@ -7,28 +7,26 @@ import (
 type Manager interface {
 	Add(id uint64, p *Peer)
 	Del(id uint64)
-
-	Produce(message interface{})
 }
 
 type manager struct {
 	peers map[uint64]*Peer
-	ctid  mw.TypeID
-	ptid  mw.TypeID
+	cqid  mw.QId
+	pqid  mw.QId
 
 	mw.Middleware
 }
 
 func NewManager(mdw mw.Middleware) (pm *manager) {
 	defer func() {
-		pm.Bind("up", mw.A_PRODUCER, pm)
-		pm.Bind("down", mw.A_CONSUMER, pm)
+		pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
+		pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
 	}()
 	return &manager{
 		peers:      make(map[uint64]*Peer),
 		Middleware: mdw,
-		ctid:       mw.TId("down"),
-		ptid:       mw.TId("up"),
+		cqid:       mdw.GetQId(mw.T_TRANSFER, "up"),
+		pqid:       mdw.GetQId(mw.T_TRANSFER, "down"),
 	}
 }
 
@@ -49,9 +47,9 @@ func (pm *manager) Unicast(id uint64, message interface{}) {
 func (pm *manager) Broadcast(message interface{}) {
 }
 
-func (pm *manager) Produce(message interface{}) {
-	pm.Middleware.Produce(pm.ptid, message)
+func (pm *manager) Consume(message interface{}) {
 }
 
-func (pm *manager) Consume(message interface{}) {
+func (pm *manager) Produce(message interface{}) {
+	pm.Middleware.Produce(mw.T_TRANSFER, pm.pqid, message)
 }

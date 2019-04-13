@@ -8,6 +8,7 @@ import (
 	"github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
 	evp "github.com/halivor/frontend/eventpool"
+	m "github.com/halivor/frontend/middleware"
 )
 
 type Peer struct {
@@ -15,25 +16,34 @@ type Peer struct {
 	rb []byte
 	ps peerStat
 
+	tid m.TypeID
+	cid m.CategoryID
+
 	c.Conn
 	evp.EventPool
 	Manager
+	m.Middleware
 
 	*log.Logger
 }
 
-func New(conn c.Conn, ep evp.EventPool, pm Manager) *Peer {
-	return &Peer{
+func New(conn c.Conn, ep evp.EventPool, pm Manager, mw m.Middleware) (p *Peer) {
+	defer func() {
+		p.Bind(m.T_TRANSFER, "", m.A_PRODUCE, nil)
+	}()
+	p = &Peer{
 		ev: syscall.EPOLLIN,
 		rb: make([]byte, 4096),
 		ps: PS_ESTAB,
 
-		Conn:      conn,
-		EventPool: ep,
-		Manager:   pm.(*manager),
+		Conn:       conn,
+		EventPool:  ep,
+		Manager:    pm,
+		Middleware: mw,
 
 		Logger: config.NewLogger(fmt.Sprint("[peer(%d)]", conn.Fd())),
 	}
+	return
 }
 
 func (p *Peer) CallBack(ev uint32) {
@@ -52,7 +62,7 @@ func (p *Peer) CallBack(ev uint32) {
 		case PS_NORMAL:
 		case PS_END:
 		default:
-			p.Produce(p.rb[0:n])
+			p.Produce(0, 0, p.rb[0:n])
 		}
 	case ev&syscall.EPOLLERR != 0:
 		p.DelEvent(p)

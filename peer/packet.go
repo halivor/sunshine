@@ -6,7 +6,11 @@ package peer
 // p - protobuf
 // s - string
 type packet struct {
-	mt   byte
-	uid  uint64
-	data string
+	version [1]byte
+	length  [4]byte
+	uid     [12]byte
+	room    [8]byte
+	mac     [32]byte
+	seq     [12]byte
+	body    []byte
 }

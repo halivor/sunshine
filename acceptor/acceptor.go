@@ -64,7 +64,7 @@ func (a *Acceptor) CallBack(ev uint32) {
 	case syscall.EAGAIN, syscall.EINTR:
 	case nil:
 		a.Println("accept connection", fd)
-		a.AddEvent(p.New(c.NewSock(fd), a.EventPool, a.Manager))
+		a.AddEvent(p.New(c.NewSock(fd), a.EventPool, a.Manager, mw))
 	default:
 		a.Println(e)
 		a.DelEvent(a)
