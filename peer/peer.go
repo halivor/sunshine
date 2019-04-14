@@ -5,43 +5,40 @@ import (
 	"log"
 	"syscall"
 
-	"github.com/halivor/frontend/config"
+	bp "github.com/halivor/frontend/bufferpool"
+	cnf "github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
 	evp "github.com/halivor/frontend/eventpool"
-	m "github.com/halivor/frontend/middleware"
 )
 
+type uinfo struct {
+	id   uint64
+	room uint32
+	ttl  uint32
+}
+
 type Peer struct {
-	ev uint32
 	rb []byte
+	ev uint32
 	ps peerStat
 
-	tid m.TypeID
-	cid m.CategoryID
-
+	*uinfo
+	Manager
 	c.Conn
 	evp.EventPool
-	Manager
-	m.Middleware
-
 	*log.Logger
 }
 
-func New(conn c.Conn, ep evp.EventPool, pm Manager, mw m.Middleware) (p *Peer) {
-	defer func() {
-		p.Bind(m.T_TRANSFER, "", m.A_PRODUCE, nil)
-	}()
+func New(conn c.Conn, ep evp.EventPool, pm Manager) (p *Peer) {
 	p = &Peer{
 		ev: syscall.EPOLLIN,
-		rb: make([]byte, 4096),
+		rb: bp.Alloc(),
 		ps: PS_ESTAB,
 
-		Conn:       conn,
-		EventPool:  ep,
-		Manager:    pm,
-		Middleware: mw,
-
-		Logger: config.NewLogger(fmt.Sprint("[peer(%d)]", conn.Fd())),
+		Manager:   pm,
+		Conn:      conn,
+		EventPool: ep,
+		Logger:    cnf.NewLogger(fmt.Sprint("[peer(%d)]", conn.Fd())),
 	}
 	return
 }
@@ -51,29 +48,41 @@ func (p *Peer) CallBack(ev uint32) {
 	case ev&syscall.EPOLLIN != 0:
 		n, e := syscall.Read(p.Fd(), p.rb)
 		if e != nil {
-			p.Println(e)
-			p.DelEvent(p)
-			p.Release()
+			switch e {
+			default:
+				p.Release()
+			}
 			return
 		}
 		switch p.ps {
 		case PS_ESTAB:
-			p.check(p.rb[:n])
+			if p.check(p.rb[0:n]) {
+				// 用户信息结构
+				p.Manager.Add(p)
+				p.Manager.Transfer(p.rb[0:n])
+			} else {
+				p.Release()
+			}
 		case PS_NORMAL:
+			p.Manager.Transfer(p.rb[0:n])
 		case PS_END:
 		default:
-			p.Produce(0, 0, p.rb[0:n])
 		}
 	case ev&syscall.EPOLLERR != 0:
-		p.DelEvent(p)
 		p.Release()
 	case ev&syscall.EPOLLOUT != 0:
 		if e := p.SendAgain(); e == nil {
+			p.ev = syscall.EPOLLIN
+			p.ModEvent(p)
 		}
 	}
 }
 
-func (p *Peer) check(message []byte) {
+func (p *Peer) check(message interface{}) bool {
+	// TODO: parse message
+	p.uinfo = &uinfo{}
+	p.ps = PS_NORMAL
+	return true
 }
 
 func (p *Peer) Event() uint32 {
@@ -81,6 +90,7 @@ func (p *Peer) Event() uint32 {
 }
 
 func (p *Peer) Release() {
+	p.DelEvent(p)
 }
 
 func (p *Peer) Send(data []byte) {

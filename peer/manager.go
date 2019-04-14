@@ -5,12 +5,15 @@ import (
 )
 
 type Manager interface {
-	Add(id uint64, p *Peer)
-	Del(id uint64)
+	Add(p *Peer)
+	Del(p *Peer)
+
+	Transfer(message []byte)
 }
 
 type manager struct {
 	peers map[uint64]*Peer
+	rooms map[uint32]map[*Peer]struct{}
 	cqid  mw.QId
 	pqid  mw.QId
 
@@ -24,32 +27,44 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 	}()
 	return &manager{
 		peers:      make(map[uint64]*Peer),
+		rooms:      make(map[uint32]map[*Peer]struct{}),
 		Middleware: mdw,
 		cqid:       mdw.GetQId(mw.T_TRANSFER, "up"),
 		pqid:       mdw.GetQId(mw.T_TRANSFER, "down"),
 	}
 }
 
-func (pm *manager) Add(id uint64, p *Peer) {
-	if pp, ok := pm.peers[id]; ok {
-		pp.DelEvent(pp)
-		p.Release()
+func (pm *manager) Add(p *Peer) {
+	// 超时重连
+	if pp, ok := pm.peers[p.id]; ok {
+		pp.Release()
 	}
-	pm.peers[id] = p
+	pm.peers[p.id] = p
+
+	if _, ok := pm.rooms[p.room]; !ok {
+		pm.rooms[p.room] = make(map[*Peer]struct{}, 1024)
+	}
+	pm.rooms[p.room][p] = struct{}{}
 }
 
-func (pm *manager) Del(id uint64) {
+func (pm *manager) Del(p *Peer) {
+	delete(pm.peers, p.id)
 }
 
-func (pm *manager) Unicast(id uint64, message interface{}) {
+func (pm *manager) unicast(message interface{}) {
 }
 
-func (pm *manager) Broadcast(message interface{}) {
+func (pm *manager) broadcast(message interface{}) {
+	if msg, ok := message.([]byte); ok {
+		for _, p := range pm.peers {
+			p.Send(msg)
+		}
+	}
 }
 
 func (pm *manager) Consume(message interface{}) {
 }
 
-func (pm *manager) Produce(message interface{}) {
-	pm.Middleware.Produce(mw.T_TRANSFER, pm.pqid, message)
+func (pm *manager) Transfer(message []byte) {
+	pm.Produce(mw.T_TRANSFER, pm.pqid, message)
 }

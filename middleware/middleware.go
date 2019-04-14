@@ -1,7 +1,7 @@
 package middleware
 
 type Middleware interface {
-	Bind(id MwId, q string, a Action, c interface{}) TypeID
+	Bind(id MwId, q string, a Action, c interface{}) QId
 	Produce(mwid MwId, qid QId, msg interface{})
 	GetQId(id MwId, q string) QId
 }
