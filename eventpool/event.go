@@ -4,18 +4,20 @@ import (
 	"syscall"
 )
 
-type TEVENT uint32
+type TEVENT int32
 
 const (
-	EVENT_READ  TEVENT = syscall.EPOLLIN
-	EVENT_WRITE TEVENT = syscall.EPOLLOUT
-	EVENT_ERROR TEVENT = syscall.EPOLLERR
+	EVENT_READ    TEVENT = syscall.EPOLLIN
+	EVENT_WRITE   TEVENT = syscall.EPOLLOUT
+	EVENT_ERROR   TEVENT = syscall.EPOLLERR
+	EVENT_EPOLLET TEVENT = syscall.EPOLLET
 )
 
 var event map[TEVENT]string = map[TEVENT]string{
-	EVENT_READ:  "event in",
-	EVENT_WRITE: "event out",
-	EVENT_ERROR: "event err",
+	EVENT_READ:    "ev in",
+	EVENT_WRITE:   "ev out",
+	EVENT_ERROR:   "ev err",
+	EVENT_EPOLLET: "ev et",
 }
 
 var es map[uint32]TEVENT = map[uint32]TEVENT{
@@ -24,7 +26,7 @@ var es map[uint32]TEVENT = map[uint32]TEVENT{
 	syscall.EPOLLERR: EVENT_ERROR,
 }
 
-type Eventer interface {
+type Event interface {
 	Fd() int
 	CallBack(ev uint32)
 	Event() uint32

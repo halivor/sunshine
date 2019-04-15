@@ -3,44 +3,52 @@ package eventpool
 import (
 	"fmt"
 	"log"
-	"os"
 	"syscall"
 
-	"github.com/halivor/frontend/config"
+	cnf "github.com/halivor/frontend/config"
 )
 
 type EventPool interface {
-	AddEvent(ev Eventer) error
-	ModEvent(ev Eventer) error
-	DelEvent(ev Eventer) error
+	AddEvent(ev Event) error
+	ModEvent(ev Event) error
+	DelEvent(ev Event) error
 }
 
 type eventpoll struct {
 	fd int
-	ev []syscall.EpollEvent
-	ss map[int]Eventer
+	ev []syscall.EpollEvent // 每次被唤醒，最大处理event数
+	ss map[int]Event        // pool中的event
 	*log.Logger
 }
 
 func init() {
 }
 
-func New() (*eventpoll, error) {
+func New() (EventPool, error) {
 	fd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	switch e {
 	case nil:
 		return &eventpoll{
 			fd:     fd,
-			ev:     make([]syscall.EpollEvent, config.MaxEvents),
-			ss:     make(map[int]Eventer, config.MaxConns),
-			Logger: log.New(os.Stderr, fmt.Sprintf("[ep(%d)] ", fd), log.LstdFlags|log.Lmicroseconds),
+			ev:     make([]syscall.EpollEvent, cnf.MaxEvents),
+			ss:     make(map[int]Event, cnf.MaxConns),
+			Logger: cnf.NewLogger(fmt.Sprintf("[ep(%d)] ", fd)),
 		}, nil
 	default:
+		// EINVAL (epoll_create1()) Invalid value specified in flags.
+		// EMFILE The per-user limit on the number of epoll instances imposed by
+		//        /proc/sys/fs/epoll/max_user_instances was encountered.  See
+		//        epoll(7) for further details.
+		// EMFILE The per-process limit on the number of open file descriptors
+		//        has been reached.
+		// ENFILE The system-wide limit on the total number of open files has
+		//        been reached.
+		// ENOMEM There was insufficient memory to create the kernel object.
 		return nil, e
 	}
 }
 
-func (m *eventpoll) AddEvent(ev Eventer) error {
+func (m *eventpoll) AddEvent(ev Event) error {
 	m.ss[ev.Fd()] = ev
 	m.Println("add event", ev.Fd(), ev.Event())
 	switch e := syscall.EpollCtl(m.fd,
@@ -51,7 +59,8 @@ func (m *eventpoll) AddEvent(ev Eventer) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
-	case syscall.EEXIST, syscall.ENOMEM, syscall.ENOSPC, syscall.EPERM:
+	case syscall.EBADF, syscall.EEXIST, syscall.EINVAL,
+		syscall.ENOMEM, syscall.ENOSPC, syscall.EPERM:
 		return e
 	default:
 		// 该epoll已不可用需要重建
@@ -59,7 +68,7 @@ func (m *eventpoll) AddEvent(ev Eventer) error {
 	}
 }
 
-func (m *eventpoll) ModEvent(ev Eventer) error {
+func (m *eventpoll) ModEvent(ev Event) error {
 	m.Println("mod event", ev.Fd(), ev.Event())
 	switch e := syscall.EpollCtl(m.fd,
 		syscall.EPOLL_CTL_MOD,
@@ -69,7 +78,8 @@ func (m *eventpoll) ModEvent(ev Eventer) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
-	case syscall.ENOENT, syscall.EEXIST, syscall.ENOMEM, syscall.ENOSPC, syscall.EPERM:
+	case syscall.EBADF, syscall.EINVAL, syscall.ENOENT,
+		syscall.ENOMEM, syscall.EPERM:
 		return e
 	default:
 		// 该epoll已不可用需要重建
@@ -77,7 +87,7 @@ func (m *eventpoll) ModEvent(ev Eventer) error {
 	}
 }
 
-func (m *eventpoll) DelEvent(ev Eventer) error {
+func (m *eventpoll) DelEvent(ev Event) error {
 	m.Println("del event", ev.Fd(), ev.Event())
 	delete(m.ss, ev.Fd())
 	switch e := syscall.EpollCtl(m.fd,
@@ -88,7 +98,8 @@ func (m *eventpoll) DelEvent(ev Eventer) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
-	case syscall.ENOENT, syscall.EEXIST, syscall.ENOMEM, syscall.ENOSPC, syscall.EPERM:
+	case syscall.EBADF, syscall.EINVAL, syscall.ENOENT,
+		syscall.EEXIST, syscall.ENOSPC, syscall.EPERM:
 		return e
 	default:
 		// 该epoll已不可用需要重建
@@ -108,6 +119,11 @@ func (m *eventpoll) Run() {
 			}
 		default:
 			// 该epoll已不可用需要重建
+			// EBADF  epfd is not a valid file descriptor.
+			// EFAULT The memory area pointed to by events is not accessible with
+			//        write permissions.
+			// EINVAL epfd is not an epoll file descriptor, or maxevents is less
+			//        than or equal to zero.
 		}
 	}
 }

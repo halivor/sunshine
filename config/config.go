@@ -8,7 +8,7 @@ import (
 
 const (
 	MaxEvents = 128
-	MaxConns  = 1024 * 1024
+	MaxConns  = 8 * 1024
 
 	BUF_MIN_LEN = 4096
 	BUF_MAX_LEN = 4 * 1024 * 1024
