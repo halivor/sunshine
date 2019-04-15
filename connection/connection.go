@@ -23,7 +23,7 @@ type Conn interface {
 	Fd() int
 	SendAgain() error
 	Send(message []byte) error
-	Recv(buf []byte) error
+	Recv(buf []byte) (int, error)
 	Close()
 }
 

@@ -33,7 +33,10 @@ func New(addr string, ep evp.EventPool, mw m.Middleware) (a *Agent, e error) {
 		a.cmid = a.Bind(m.T_TRANSFER, "up", m.A_CONSUME, a)
 	}()
 
-	C := c.NewTcp()
+	C, e := c.NewTcp()
+	if e != nil {
+		return nil, e
+	}
 	ad, e := net.ResolveTCPAddr("tcp", addr)
 	if e != nil {
 		return nil, e

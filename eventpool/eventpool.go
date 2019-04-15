@@ -12,9 +12,10 @@ type EventPool interface {
 	AddEvent(ev Event) error
 	ModEvent(ev Event) error
 	DelEvent(ev Event) error
+	Run()
 }
 
-type eventpoll struct {
+type eventpool struct {
 	fd int
 	ev []syscall.EpollEvent // 每次被唤醒，最大处理event数
 	ss map[int]Event        // pool中的event
@@ -28,7 +29,7 @@ func New() (EventPool, error) {
 	fd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	switch e {
 	case nil:
-		return &eventpoll{
+		return &eventpool{
 			fd:     fd,
 			ev:     make([]syscall.EpollEvent, cnf.MaxEvents),
 			ss:     make(map[int]Event, cnf.MaxConns),
@@ -48,7 +49,7 @@ func New() (EventPool, error) {
 	}
 }
 
-func (m *eventpoll) AddEvent(ev Event) error {
+func (m *eventpool) AddEvent(ev Event) error {
 	m.ss[ev.Fd()] = ev
 	m.Println("add event", ev.Fd(), ev.Event())
 	switch e := syscall.EpollCtl(m.fd,
@@ -68,7 +69,7 @@ func (m *eventpoll) AddEvent(ev Event) error {
 	}
 }
 
-func (m *eventpoll) ModEvent(ev Event) error {
+func (m *eventpool) ModEvent(ev Event) error {
 	m.Println("mod event", ev.Fd(), ev.Event())
 	switch e := syscall.EpollCtl(m.fd,
 		syscall.EPOLL_CTL_MOD,
@@ -87,7 +88,7 @@ func (m *eventpoll) ModEvent(ev Event) error {
 	}
 }
 
-func (m *eventpoll) DelEvent(ev Event) error {
+func (m *eventpool) DelEvent(ev Event) error {
 	m.Println("del event", ev.Fd(), ev.Event())
 	delete(m.ss, ev.Fd())
 	switch e := syscall.EpollCtl(m.fd,
@@ -108,7 +109,7 @@ func (m *eventpoll) DelEvent(ev Event) error {
 
 }
 
-func (m *eventpoll) Run() {
+func (m *eventpool) Run() {
 	for {
 		switch n, e := syscall.EpollWait(m.fd, m.ev, 1000); e {
 		case syscall.EINTR:

@@ -28,7 +28,10 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor) 
 		a.Println("add event")
 		a.AddEvent(a)
 	}()
-	C := c.NewTcp()
+	C, e := c.NewTcp()
+	if e != nil {
+		return nil
+	}
 	saddr, _ := c.ParseAddr4("tcp", addr)
 	if err := syscall.Bind(C.Fd(), saddr); err != nil {
 		log.Panicln(err.Error())

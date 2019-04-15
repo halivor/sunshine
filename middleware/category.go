@@ -11,7 +11,7 @@ type mwer interface {
 	GetQId(q string) QId
 }
 
-type consumer interface {
+type Consumer interface {
 	Consume(m interface{})
 }
 
@@ -25,7 +25,12 @@ const (
 	A_CONSUME Action = 2
 )
 
-var mws map[MwId]mwer = map[MwId]mwer{
-	T_TRANSFER: newTransfor(),
-	T_CHECK:    newCheck(),
+var components map[MwId]interface{}
+
+func init() {
+	components = make(map[MwId]interface{}, 64)
+}
+
+func Register(id MwId, New interface{}) {
+	components[id] = New
 }
