@@ -7,32 +7,35 @@ import (
 	ac "github.com/halivor/frontend/acceptor"
 	ag "github.com/halivor/frontend/agent"
 	evp "github.com/halivor/frontend/eventpool"
-	m "github.com/halivor/frontend/middleware"
-	_ "github.com/halivor/frontend/middleware/transfor"
+	mw "github.com/halivor/frontend/middleware"
+	_ "github.com/halivor/frontend/middleware/transfer"
 )
 
 var wg sync.WaitGroup
 
 func main() {
 	wg.Add(1)
-	go newFrontEnd()
+	go newFrontend()
 	wg.Wait()
 }
 
-func newFrontEnd() {
+func newFrontend() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println(r)
+			log.Println("panic =>", r)
 		}
 		wg.Done()
 	}()
 	ep, e := evp.New()
 	if e != nil {
-		return
+		log.Println("new event pool failed:", e)
 	}
-	mw := m.New()
-	ac.NewTcpAcceptor("0.0.0.0:19981", ep, mw)
-	ag.New("127.0.0.1:9981", ep, mw)
+	mws := mw.New()
+	if _, e := ac.NewTcpAcceptor("0.0.0.0:19981", ep, mws); e != nil {
+		log.Println("new acceptor failed:", e)
+	}
+	if _, e := ag.New("127.0.0.1:29981", ep, mws); e != nil {
+		log.Println("new agent failed:", e)
+	}
 	ep.Run()
-	wg.Done()
 }

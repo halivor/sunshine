@@ -14,7 +14,7 @@ func init() {
 	mw.Register(mw.T_CHECK, New)
 }
 
-func New() *check {
+func New() Mwer {
 	return &check{
 		id:  10000,
 		qid: make(map[string]mw.QId),

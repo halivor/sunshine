@@ -23,31 +23,39 @@ type Acceptor struct {
 	*log.Logger
 }
 
-func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor) {
+func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, e error) {
 	defer func() {
-		a.Println("add event")
 		a.AddEvent(a)
 	}()
+
 	C, e := c.NewTcp()
 	if e != nil {
-		return nil
+		return nil, e
 	}
-	saddr, _ := c.ParseAddr4("tcp", addr)
-	if err := syscall.Bind(C.Fd(), saddr); err != nil {
-		log.Panicln(err.Error())
+	saddr, e := c.ParseAddr4("tcp", addr)
+	if e != nil {
+		return nil, e
+	}
+	if e = syscall.Bind(C.Fd(), saddr); e != nil {
+		return nil, e
 	}
 
-	if err := syscall.Listen(C.Fd(), 1024); err != nil {
-		log.Panicln(err.Error())
+	if e = syscall.Listen(C.Fd(), 1024); e != nil {
+		return nil, e
 	}
-	return &Acceptor{
+
+	a = &Acceptor{
 		ev:        syscall.EPOLLIN,
 		addr:      addr,
 		C:         C,
 		EventPool: ep,
 		Manager:   p.NewManager(mw),
-		Logger:    config.NewLogger(fmt.Sprintf("[lsn(%d)] ", C.Fd())),
+		Logger:    config.NewLogger(fmt.Sprintf("[accept(%d)] ", C.Fd())),
 	}
+
+	a.Println("non block", c.NonBlock(C.Fd()))
+	a.Println("reuse addr port", c.Reuse(C.Fd(), true))
+	return a, nil
 }
 
 // TODO: 细化异常处理流程

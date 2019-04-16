@@ -1,6 +1,9 @@
 package peer
 
 import (
+	"log"
+
+	cnf "github.com/halivor/frontend/config"
 	mw "github.com/halivor/frontend/middleware"
 )
 
@@ -18,19 +21,19 @@ type manager struct {
 	pqid  mw.QId
 
 	mw.Middleware
+	*log.Logger
 }
 
 func NewManager(mdw mw.Middleware) (pm *manager) {
 	defer func() {
-		pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
-		pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
+		pm.cqid = pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
+		pm.pqid = pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
 	}()
 	return &manager{
 		peers:      make(map[uint64]*Peer),
 		rooms:      make(map[uint32]map[*Peer]struct{}),
 		Middleware: mdw,
-		cqid:       mdw.GetQId(mw.T_TRANSFER, "up"),
-		pqid:       mdw.GetQId(mw.T_TRANSFER, "down"),
+		Logger:     cnf.NewLogger("[pm] "),
 	}
 }
 
@@ -63,6 +66,9 @@ func (pm *manager) broadcast(message interface{}) {
 }
 
 func (pm *manager) Consume(message interface{}) {
+	if buf, ok := message.([]byte); ok {
+		pm.Println("consume", string(buf))
+	}
 }
 
 func (pm *manager) Transfer(message []byte) {

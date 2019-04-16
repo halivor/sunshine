@@ -5,7 +5,7 @@ type QId int32  // 队列ID
 type AId int32  // 身份ID
 type Action uint32
 
-type mwer interface {
+type Mwer interface {
 	Bind(q string, a Action, c interface{}) QId
 	Produce(id QId, message interface{})
 	GetQId(q string) QId

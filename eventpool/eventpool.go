@@ -13,12 +13,14 @@ type EventPool interface {
 	ModEvent(ev Event) error
 	DelEvent(ev Event) error
 	Run()
+	Stop()
 }
 
 type eventpool struct {
-	fd int
-	ev []syscall.EpollEvent // 每次被唤醒，最大处理event数
-	ss map[int]Event        // pool中的event
+	fd   int
+	ev   []syscall.EpollEvent // 每次被唤醒，最大处理event数
+	ss   map[int]Event        // pool中的event
+	stop bool
 	*log.Logger
 }
 
@@ -33,6 +35,7 @@ func New() (EventPool, error) {
 			fd:     fd,
 			ev:     make([]syscall.EpollEvent, cnf.MaxEvents),
 			ss:     make(map[int]Event, cnf.MaxConns),
+			stop:   false,
 			Logger: cnf.NewLogger(fmt.Sprintf("[ep(%d)] ", fd)),
 		}, nil
 	default:
@@ -110,12 +113,12 @@ func (m *eventpool) DelEvent(ev Event) error {
 }
 
 func (m *eventpool) Run() {
-	for {
+	for !m.stop {
 		switch n, e := syscall.EpollWait(m.fd, m.ev, 1000); e {
 		case syscall.EINTR:
 		case nil:
 			for i := 0; i < n; i++ {
-				m.Println(event[es[m.ev[i].Events]])
+				//m.Println(event[es[m.ev[i].Events]])
 				m.ss[int(m.ev[i].Fd)].CallBack(m.ev[i].Events)
 			}
 		default:
@@ -127,4 +130,9 @@ func (m *eventpool) Run() {
 			//        than or equal to zero.
 		}
 	}
+	m.Println("event pool stop")
+}
+
+func (m *eventpool) Stop() {
+	m.stop = true
 }
