@@ -17,8 +17,7 @@ type Manager interface {
 type manager struct {
 	peers map[uint64]*Peer
 	rooms map[uint32]map[*Peer]struct{}
-	cqid  mw.QId
-	pqid  mw.QId
+	uqid  mw.QId
 
 	mw.Middleware
 	*log.Logger
@@ -26,8 +25,8 @@ type manager struct {
 
 func NewManager(mdw mw.Middleware) (pm *manager) {
 	defer func() {
-		pm.cqid = pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
-		pm.pqid = pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
+		pm.uqid = pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
+		pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
 	}()
 	return &manager{
 		peers:      make(map[uint64]*Peer),
@@ -72,5 +71,6 @@ func (pm *manager) Consume(message interface{}) {
 }
 
 func (pm *manager) Transfer(message []byte) {
-	pm.Produce(mw.T_TRANSFER, pm.pqid, message)
+	pm.Println("produce", string(message))
+	pm.Produce(mw.T_TRANSFER, pm.uqid, message)
 }

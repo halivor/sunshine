@@ -21,8 +21,7 @@ type Agent struct {
 	*c.C
 	evp.EventPool
 
-	pqid m.QId
-	cqid m.QId
+	dqid m.QId
 	m.Middleware
 
 	*log.Logger
@@ -34,8 +33,8 @@ func New(addr string, ep evp.EventPool, mw m.Middleware) (a *Agent, e error) {
 			if e := a.AddEvent(a); e != nil {
 				a.Println("add event failed:", e)
 			}
-			a.pqid = a.Bind(m.T_TRANSFER, "down", m.A_PRODUCE, a)
-			a.cqid = a.Bind(m.T_TRANSFER, "up", m.A_CONSUME, a)
+			a.dqid = a.Bind(m.T_TRANSFER, "down", m.A_PRODUCE, a)
+			a.Bind(m.T_TRANSFER, "up", m.A_CONSUME, a)
 		}
 	}()
 
@@ -73,7 +72,7 @@ func (a *Agent) CallBack(ev uint32) {
 			a.Release()
 		}
 		a.Println("produce", string(a.buf[:n]))
-		a.Produce(m.T_TRANSFER, a.pqid, a.buf[:n])
+		a.Produce(m.T_TRANSFER, a.dqid, a.buf[:n])
 	case ev&syscall.EPOLLOUT != 0:
 	case ev&syscall.EPOLLERR != 0:
 	default:
@@ -85,4 +84,10 @@ func (a *Agent) Event() uint32 {
 }
 
 func (a *Agent) Release() {
+}
+
+func (a *Agent) Consume(message interface{}) {
+	if msg, ok := message.([]byte); ok {
+		a.Println("consume", string(msg))
+	}
 }

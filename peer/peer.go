@@ -80,7 +80,10 @@ func (p *Peer) CallBack(ev uint32) {
 
 func (p *Peer) check(message interface{}) bool {
 	// TODO: parse message
-	p.uinfo = &uinfo{}
+	p.uinfo = &uinfo{
+		id:   1000,
+		room: 1000,
+	}
 	p.ps = PS_NORMAL
 	return true
 }
