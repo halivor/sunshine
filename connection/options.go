@@ -39,3 +39,8 @@ func Reuse(fd int, reusePort bool) error {
 func NoDelay(fd int) error {
 	return syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.TCP_NODELAY, 1)
 }
+
+// TODO: 确认Linger情况下，close对于Block和NonBlock socket的影响
+func Linger(fd int) error {
+	return syscall.SetsockoptLinger(fd, syscall.SOL_SOCKET, syscall.SO_LINGER, &syscall.Linger{Onoff: 1, Linger: 3})
+}

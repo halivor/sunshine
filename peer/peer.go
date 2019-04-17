@@ -38,7 +38,7 @@ func New(conn c.Conn, ep evp.EventPool, pm Manager) (p *Peer) {
 		Manager:   pm,
 		Conn:      conn,
 		EventPool: ep,
-		Logger:    cnf.NewLogger(fmt.Sprint("[peer(%d)]", conn.Fd())),
+		Logger:    cnf.NewLogger(fmt.Sprintf("[peer(%d)]", conn.Fd())),
 	}
 	return
 }
@@ -47,12 +47,14 @@ func (p *Peer) CallBack(ev uint32) {
 	switch {
 	case ev&syscall.EPOLLIN != 0:
 		n, e := syscall.Read(p.Fd(), p.rb)
-		if e != nil {
+		if e != nil || n == 0 {
 			switch e {
+			case syscall.EAGAIN:
+				return
 			default:
 				p.Release()
+				return
 			}
-			return
 		}
 		switch p.ps {
 		case PS_ESTAB:
@@ -93,6 +95,7 @@ func (p *Peer) Event() uint32 {
 }
 
 func (p *Peer) Release() {
+	syscall.Close(p.Fd())
 	p.DelEvent(p)
 }
 

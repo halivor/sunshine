@@ -25,7 +25,6 @@ func New() *middleware {
 			cs[id] = f()
 		}
 	}
-	log.Println(T_TRANSFER, T_CHECK, components, cs)
 	return &middleware{
 		category: make(map[TypeID][]Consume),
 		mwers:    cs,
@@ -48,7 +47,6 @@ func (m *middleware) Bind(mwid MwId, q string, a Action, c interface{}) QId {
 }
 
 func (m *middleware) Produce(id MwId, qid QId, msg interface{}) {
-	m.Println("produce to components")
 	if mw, ok := m.mwers[id]; ok {
 		mw.Produce(qid, msg)
 	}

@@ -43,7 +43,6 @@ func (t *transfer) Bind(q string, a mw.Action, c interface{}) mw.QId {
 
 func (t *transfer) Produce(id mw.QId, message interface{}) {
 	if cs, ok := t.cs[id]; ok {
-		t.Println("produce to", len(cs), "consumer")
 		for _, c := range cs {
 			c.Consume(message)
 		}

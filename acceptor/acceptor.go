@@ -71,7 +71,6 @@ func (a *Acceptor) CallBack(ev uint32) {
 		a.Println("accept connection", fd)
 		a.AddEvent(p.New(c.NewSock(fd), a.EventPool, a.Manager))
 	default:
-		a.Println(e)
 		a.DelEvent(a)
 		// TODO: 释放并重启acceptor
 	}
