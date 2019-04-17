@@ -64,10 +64,11 @@ func (pm *manager) broadcast(message interface{}) {
 	}
 }
 
-func (pm *manager) Consume(message interface{}) {
+func (pm *manager) Consume(message interface{}) interface{} {
 	if buf, ok := message.([]byte); ok {
 		pm.Println("consume", string(buf))
 	}
+	return nil
 }
 
 func (pm *manager) Transfer(message []byte) {

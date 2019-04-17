@@ -86,8 +86,9 @@ func (a *Agent) Event() uint32 {
 func (a *Agent) Release() {
 }
 
-func (a *Agent) Consume(message interface{}) {
+func (a *Agent) Consume(message interface{}) interface{} {
 	if msg, ok := message.([]byte); ok {
 		a.Println("consume", string(msg))
 	}
+	return nil
 }

@@ -8,7 +8,7 @@ import (
 
 type Middleware interface {
 	Bind(id MwId, q string, a Action, c interface{}) QId
-	Produce(mwid MwId, qid QId, msg interface{})
+	Produce(mwid MwId, qid QId, msg interface{}) interface{}
 	GetQId(id MwId, q string) QId
 }
 
@@ -46,8 +46,9 @@ func (m *middleware) Bind(mwid MwId, q string, a Action, c interface{}) QId {
 	return -1
 }
 
-func (m *middleware) Produce(id MwId, qid QId, msg interface{}) {
+func (m *middleware) Produce(id MwId, qid QId, msg interface{}) interface{} {
 	if mw, ok := m.mwers[id]; ok {
-		mw.Produce(qid, msg)
+		return mw.Produce(qid, msg)
 	}
+	return nil
 }

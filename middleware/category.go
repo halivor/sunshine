@@ -7,22 +7,25 @@ type Action uint32
 
 type Mwer interface {
 	Bind(q string, a Action, c interface{}) QId
-	Produce(id QId, message interface{})
+	Produce(id QId, message interface{}) interface{}
 	GetQId(q string) QId
 }
 
 type Consumer interface {
-	Consume(m interface{})
+	Consume(m interface{}) interface{}
 }
 
+// 中间件类型
 const (
-	// 中间件类型
 	T_TRANSFER MwId = 1 << iota // 透明转发
 	T_CHECK                     // 消息校验
+	T_EXISTS                    // Peer ID 校验
+)
 
-	// 行为
-	A_PRODUCE Action = 1
-	A_CONSUME Action = 2
+// 行为
+const (
+	A_PRODUCE Action = 1 + iota
+	A_CONSUME
 )
 
 var components map[MwId]interface{}
