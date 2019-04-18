@@ -20,6 +20,8 @@ const (
 	T_TRANSFER MwId = 1 << iota // 透明转发
 	T_CHECK                     // 消息校验
 	T_EXISTS                    // Peer ID 校验
+	T_CHAT                      // 私聊消息
+	T_BULLET                    // 聊天消息
 )
 
 // 行为

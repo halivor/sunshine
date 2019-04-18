@@ -7,6 +7,11 @@ import (
 )
 
 const (
+	VER = 1<<12 + 0<<8 + 0
+	KEY = "$laCK62H4X$A1M2A"
+
+	NodeId = 1
+
 	MaxEvents = 128
 	MaxConns  = 8 * 1024
 

@@ -21,7 +21,9 @@ type Agent struct {
 	*c.C
 	evp.EventPool
 
-	dqid m.QId
+	tqid m.QId
+	cqid m.QId
+	bqid m.QId
 	m.Middleware
 
 	*log.Logger
@@ -33,7 +35,9 @@ func New(addr string, ep evp.EventPool, mw m.Middleware) (a *Agent, e error) {
 			if e := a.AddEvent(a); e != nil {
 				a.Println("add event failed:", e)
 			}
-			a.dqid = a.Bind(m.T_TRANSFER, "down", m.A_PRODUCE, a)
+			a.tqid = a.Bind(m.T_TRANSFER, "down", m.A_PRODUCE, a)
+			a.cqid = a.Bind(m.T_CHAT, "upload", m.A_PRODUCE, a)
+			a.bqid = a.Bind(m.T_BULLET, "upload", m.A_PRODUCE, a)
 			a.Bind(m.T_TRANSFER, "up", m.A_CONSUME, a)
 		}
 	}()
@@ -46,6 +50,7 @@ func New(addr string, ep evp.EventPool, mw m.Middleware) (a *Agent, e error) {
 	if e != nil {
 		return nil, e
 	}
+	// TODO: 远程地址会解析失败，确认问题
 	saddr := &syscall.SockaddrInet4{Port: ad.Port}
 	copy(saddr.Addr[:], ad.IP[0:4])
 
@@ -72,7 +77,7 @@ func (a *Agent) CallBack(ev uint32) {
 			a.Release()
 		}
 		a.Println("produce", string(a.buf[:n]))
-		a.Produce(m.T_TRANSFER, a.dqid, a.buf[:n])
+		a.Produce(m.T_TRANSFER, a.tqid, a.buf[:n])
 	case ev&syscall.EPOLLOUT != 0:
 	case ev&syscall.EPOLLERR != 0:
 	default:
@@ -88,7 +93,8 @@ func (a *Agent) Release() {
 
 func (a *Agent) Consume(message interface{}) interface{} {
 	if msg, ok := message.([]byte); ok {
-		a.Println("consume", string(msg))
+		a.Produce(m.T_CHAT, a.cqid, msg)
+		a.Produce(m.T_BULLET, a.bqid, msg)
 	}
 	return nil
 }

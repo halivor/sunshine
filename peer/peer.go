@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 	"syscall"
+	"unsafe"
 
 	bp "github.com/halivor/frontend/bufferpool"
 	cnf "github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
 	evp "github.com/halivor/frontend/eventpool"
+	pkt "github.com/halivor/frontend/packet"
 )
 
 type uinfo struct {
@@ -22,7 +24,7 @@ type Peer struct {
 	ev uint32
 	ps peerStat
 
-	*uinfo
+	*pkt.Header
 	Manager
 	c.Conn
 	evp.EventPool
@@ -46,7 +48,7 @@ func New(conn c.Conn, ep evp.EventPool, pm Manager) (p *Peer) {
 func (p *Peer) CallBack(ev uint32) {
 	switch {
 	case ev&syscall.EPOLLIN != 0:
-		n, e := syscall.Read(p.Fd(), p.rb)
+		n, e := syscall.Read(p.Fd(), p.rb[pkt.HLen:])
 		if e != nil || n == 0 {
 			switch e {
 			case syscall.EAGAIN:
@@ -58,7 +60,7 @@ func (p *Peer) CallBack(ev uint32) {
 		}
 		switch p.ps {
 		case PS_ESTAB:
-			if p.check(p.rb[0:n]) {
+			if p.check(p.rb[:pkt.HLen+n]) {
 				// 用户信息结构
 				p.Manager.Add(p)
 				p.Manager.Transfer(p.rb[0:n])
@@ -80,12 +82,15 @@ func (p *Peer) CallBack(ev uint32) {
 	}
 }
 
-func (p *Peer) check(message interface{}) bool {
+func (p *Peer) check(message []byte) bool {
+	p.Println(string(message))
 	// TODO: parse message
-	p.uinfo = &uinfo{
-		id:   1000,
-		room: 1000,
-	}
+	h := (*pkt.Header)(unsafe.Pointer(&message[0]))
+	uh := (*pkt.UHeader)(unsafe.Pointer(&message[pkt.HLen]))
+	h.Ver = cnf.VER
+	h.Nid = cnf.NodeId
+	h.Uid = uh.Uid
+	h.Cid = uh.Cid
 	p.ps = PS_NORMAL
 	return true
 }

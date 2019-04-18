@@ -2,9 +2,11 @@ package peer
 
 import (
 	"log"
+	"unsafe"
 
 	cnf "github.com/halivor/frontend/config"
 	mw "github.com/halivor/frontend/middleware"
+	pkt "github.com/halivor/frontend/packet"
 )
 
 type Manager interface {
@@ -15,7 +17,7 @@ type Manager interface {
 }
 
 type manager struct {
-	peers map[uint64]*Peer
+	peers map[uint32]*Peer
 	rooms map[uint32]map[*Peer]struct{}
 	uqid  mw.QId
 
@@ -29,7 +31,7 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 		pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
 	}()
 	return &manager{
-		peers:      make(map[uint64]*Peer),
+		peers:      make(map[uint32]*Peer),
 		rooms:      make(map[uint32]map[*Peer]struct{}),
 		Middleware: mdw,
 		Logger:     cnf.NewLogger("[pm] "),
@@ -38,35 +40,43 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 
 func (pm *manager) Add(p *Peer) {
 	// 超时重连
-	if pp, ok := pm.peers[p.id]; ok {
+	if pp, ok := pm.peers[p.Uid]; ok {
 		pp.Release()
 	}
-	pm.peers[p.id] = p
+	pm.peers[p.Uid] = p
 
-	if _, ok := pm.rooms[p.room]; !ok {
-		pm.rooms[p.room] = make(map[*Peer]struct{}, 1024)
+	if _, ok := pm.rooms[p.Cid]; !ok {
+		pm.rooms[p.Cid] = make(map[*Peer]struct{}, 1024)
 	}
-	pm.rooms[p.room][p] = struct{}{}
+	pm.rooms[p.Cid][p] = struct{}{}
 }
 
 func (pm *manager) Del(p *Peer) {
-	delete(pm.peers, p.id)
+	delete(pm.peers, p.Uid)
 }
 
-func (pm *manager) unicast(message interface{}) {
+func (pm *manager) unicast(uid uint32, message []byte) {
+	if up, ok := pm.peers[uid]; ok {
+		up.Send(message)
+	}
 }
 
-func (pm *manager) broadcast(message interface{}) {
-	if msg, ok := message.([]byte); ok {
-		for _, p := range pm.peers {
-			p.Send(msg)
-		}
+func (pm *manager) broadcast(message []byte) {
+	for _, p := range pm.peers {
+		p.Send(message)
 	}
 }
 
 func (pm *manager) Consume(message interface{}) interface{} {
 	if buf, ok := message.([]byte); ok {
-		pm.Println("consume", string(buf))
+		uh := (*pkt.UHeader)(unsafe.Pointer(&buf[pkt.HLen]))
+		switch uh.Ver {
+		case 1:
+			pm.broadcast(buf)
+		case 3:
+			pm.unicast(uh.Uid, buf)
+		}
+
 	}
 	return nil
 }

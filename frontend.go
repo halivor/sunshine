@@ -19,6 +19,8 @@ func main() {
 	wg.Wait()
 }
 
+// 20190418 -> 单核CPU，35000连接，每秒4条消息，CPU达到100%
+// 20190419 -> 单核CPU， 8000连接，每秒20条消息，CPU达到100%
 func newFrontend() {
 	defer func() {
 		if r := recover(); r != nil {
