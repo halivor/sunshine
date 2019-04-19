@@ -130,7 +130,7 @@ func (ep *eventpool) Run() {
 				ep.es[int(ep.ev[i].Fd)].CallBack(ep.ev[i].Events)
 			}
 		default:
-			// 该epoll已不可用需要重建
+			// 理论上不存在，若存在则直接重建
 			// EBADF  epfd is not a valid file descriptor.
 			// EFAULT The memory area pointed to by events is not accessible with
 			//        write permissions.
@@ -138,7 +138,6 @@ func (ep *eventpool) Run() {
 			//        than or equal to zero.
 
 			ep.Println("epoll wait error", e)
-			// 理论上不存在，若存在则直接重建
 			if e := ep.reNew(); e != nil {
 				ep.Println("ep run failed,", e)
 				return

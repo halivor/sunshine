@@ -4,10 +4,6 @@ import (
 	"syscall"
 )
 
-func NonBlock(fd int) error {
-	return syscall.SetsockoptInt(fd, syscall.SOL_TCP, syscall.SOCK_NONBLOCK, 1)
-}
-
 func KeepAlive(fd int) error {
 	if e := syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_KEEPALIVE, 1); e != nil {
 		return e

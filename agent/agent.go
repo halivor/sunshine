@@ -42,7 +42,7 @@ func New(addr string, ep evp.EventPool, mw m.Middleware) (a *Agent, e error) {
 		}
 	}()
 
-	C, e := c.NewTcp()
+	C, e := c.NewTcpConn()
 	if e != nil {
 		return nil, e
 	}

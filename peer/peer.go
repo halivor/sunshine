@@ -3,6 +3,7 @@ package peer
 import (
 	"fmt"
 	"log"
+	"os"
 	"syscall"
 	"unsafe"
 
@@ -20,11 +21,12 @@ type uinfo struct {
 }
 
 type Peer struct {
-	rb []byte
-	ev uint32
-	ps peerStat
+	rb  []byte
+	pos int
+	ev  uint32
+	ps  peerStat
 
-	*pkt.Header
+	pkt.Header
 	Manager
 	c.Conn
 	evp.EventPool
@@ -33,9 +35,10 @@ type Peer struct {
 
 func New(conn c.Conn, ep evp.EventPool, pm Manager) (p *Peer) {
 	p = &Peer{
-		ev: syscall.EPOLLIN,
-		rb: bp.Alloc(),
-		ps: PS_ESTAB,
+		ev:  syscall.EPOLLIN,
+		rb:  bp.Alloc(),
+		pos: pkt.HLen,
+		ps:  PS_ESTAB,
 
 		Manager:   pm,
 		Conn:      conn,
@@ -46,53 +49,96 @@ func New(conn c.Conn, ep evp.EventPool, pm Manager) (p *Peer) {
 }
 
 func (p *Peer) CallBack(ev uint32) {
-	switch {
-	case ev&syscall.EPOLLIN != 0:
-		n, e := syscall.Read(p.Fd(), p.rb[pkt.HLen:])
-		if e != nil || n == 0 {
-			switch e {
-			case syscall.EAGAIN:
-				return
-			default:
-				p.Release()
-				return
+	for {
+		switch {
+		case ev&syscall.EPOLLIN != 0:
+			if n, e := syscall.Read(p.Fd(), p.rb[p.pos:]); e != nil || n == 0 {
+				p.pos += n
+				// 头长度不够，继续读取
+				if p.pos < pkt.HLen+pkt.UHLen {
+					return
+				}
+				switch e {
+				case syscall.EAGAIN:
+					return
+				default:
+					p.Release()
+					return
+				}
 			}
-		}
-		switch p.ps {
-		case PS_ESTAB:
-			if p.check(p.rb[:pkt.HLen+n]) {
-				// 用户信息结构
-				p.Manager.Add(p)
-				p.Manager.Transfer(p.rb[0:n])
-			} else {
+			p.Do()
+		case ev&syscall.EPOLLERR != 0:
+			p.Release()
+		case ev&syscall.EPOLLOUT != 0:
+			if e := p.SendAgain(); e == nil {
+				p.ev = syscall.EPOLLIN
+				p.ModEvent(p)
+			} else if e == os.ErrClosed {
 				p.Release()
 			}
-		case PS_NORMAL:
-			p.Manager.Transfer(p.rb[0:n])
-		case PS_END:
-		default:
-		}
-	case ev&syscall.EPOLLERR != 0:
-		p.Release()
-	case ev&syscall.EPOLLOUT != 0:
-		if e := p.SendAgain(); e == nil {
-			p.ev = syscall.EPOLLIN
-			p.ModEvent(p)
 		}
 	}
 }
 
-func (p *Peer) check(message []byte) bool {
-	p.Println(string(message))
-	// TODO: parse message
-	h := (*pkt.Header)(unsafe.Pointer(&message[0]))
-	uh := (*pkt.UHeader)(unsafe.Pointer(&message[pkt.HLen]))
+func (p *Peer) Do() error {
+	switch p.ps {
+	case PS_ESTAB:
+		if e := p.check(); e != nil {
+			return e
+		}
+		// 用户信息结构
+		p.Manager.Add(p)
+		for {
+			packet, e := p.Parse()
+			if e != nil {
+				return e
+			}
+			p.Manager.Transfer(packet)
+		}
+	case PS_NORMAL:
+		for {
+			packet, e := p.Parse()
+			if e != nil {
+				return e
+			}
+			p.Manager.Transfer(packet)
+		}
+	}
+	return nil
+}
+
+func (p *Peer) check() error {
+	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
+	uh := (*pkt.UHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
 	h.Ver = cnf.VER
 	h.Nid = cnf.NodeId
 	h.Uid = uh.Uid
 	h.Cid = uh.Cid
 	p.ps = PS_NORMAL
-	return true
+	p.Header = *(*pkt.Header)(unsafe.Pointer(&p.rb[0]))
+	// verify failed os.ErrInvalid
+	return nil
+}
+
+func (p *Peer) Parse() ([]byte, error) {
+	uh := (*pkt.UHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
+	if uh.Len > 4*1024 {
+		return nil, os.ErrInvalid
+	}
+	if pkt.HLen+pkt.UHLen+int(uh.Len) < p.pos {
+		return nil, syscall.EAGAIN
+	}
+	packet := p.rb[:pkt.HLen+pkt.UHLen+int(uh.Len)]
+	nb := bp.Alloc()
+
+	if p.pos-pkt.HLen+pkt.UHLen+int(uh.Len) > 0 {
+		copy(nb[pkt.HLen:], p.rb[pkt.HLen+pkt.UHLen+int(uh.Len):p.pos])
+	}
+
+	p.rb = nb
+	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
+	p.pos = pkt.HLen
+	return packet, nil
 }
 
 func (p *Peer) Event() uint32 {

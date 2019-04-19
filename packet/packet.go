@@ -13,13 +13,13 @@ type Header struct {
 }
 
 type UHeader struct {
-	Ver  uint16
-	Cmd  uint16
-	Uid  uint32
-	Cid  uint32
-	Ttl  uint32
-	Len  uint16
-	Sign [34]byte
+	Ver uint16
+	Cmd uint16
+	Uid uint32
+	Cid uint32
+	Ttl uint32
+	Len uint32
+	seq uint64
 }
 
 const (

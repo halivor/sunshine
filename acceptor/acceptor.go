@@ -28,7 +28,7 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, 
 		a.AddEvent(a)
 	}()
 
-	C, e := c.NewTcp()
+	C, e := c.NewTcpConn()
 	if e != nil {
 		return nil, e
 	}
@@ -39,7 +39,6 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, 
 	if e = syscall.Bind(C.Fd(), saddr); e != nil {
 		return nil, e
 	}
-
 	if e = syscall.Listen(C.Fd(), 1024); e != nil {
 		return nil, e
 	}
@@ -53,7 +52,6 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, 
 		Logger:    config.NewLogger(fmt.Sprintf("[accept(%d)] ", C.Fd())),
 	}
 
-	a.Println("non block", c.NonBlock(C.Fd()))
 	a.Println("reuse addr port", c.Reuse(C.Fd(), true))
 	return a, nil
 }
@@ -69,16 +67,15 @@ func (a *Acceptor) CallBack(ev uint32) {
 	case syscall.EAGAIN, syscall.EINTR:
 	case nil:
 		a.Println("accept connection", fd)
-		a.AddEvent(p.New(c.NewSock(fd), a.EventPool, a.Manager))
+		a.AddEvent(p.New(c.NewConn(fd), a.EventPool, a.Manager))
 	default:
 		a.DelEvent(a)
 		// TODO: 释放并重启acceptor
 	}
 }
-
 func (a *Acceptor) Event() uint32 {
 	return a.ev
 }
-
 func (a *Acceptor) Release() {
+	a.C.Close()
 }

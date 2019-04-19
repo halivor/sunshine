@@ -33,14 +33,14 @@ type packet struct {
 }
 
 type C struct {
-	ss SockStat
 	fd int
+	ss SockStat
 	wl []*packet
 
 	*log.Logger
 }
 
-func NewSock(fd int) *C {
+func NewConn(fd int) *C {
 	return &C{
 		fd:     fd,
 		ss:     ESTAB,
@@ -49,7 +49,7 @@ func NewSock(fd int) *C {
 	}
 }
 
-func NewTcp() (*C, error) {
+func NewTcpConn() (*C, error) {
 	fd, e := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
 	if e != nil {
 		return nil, e
@@ -63,6 +63,9 @@ func NewTcp() (*C, error) {
 }
 
 func (c *C) Send(message []byte) error {
+	if c.Closed() {
+		return os.ErrClosed
+	}
 	if len(c.wl) > 0 {
 		c.wl = append(c.wl, &packet{
 			buf: message,
@@ -71,7 +74,7 @@ func (c *C) Send(message []byte) error {
 		return nil
 	}
 	n, e := syscall.Write(c.fd, message)
-	if n != len(message) {
+	if e == syscall.EAGAIN {
 		//bp.Release(message)
 		c.wl = append(c.wl, &packet{
 			buf: message,
@@ -82,13 +85,16 @@ func (c *C) Send(message []byte) error {
 }
 
 func (c *C) SendAgain() error {
+	if c.Closed() {
+		return os.ErrClosed
+	}
 	for {
 		if len(c.wl) > 0 {
 			switch n, e := syscall.Write(c.fd, c.wl[0].buf[c.wl[0].pos:]); e {
 			// 测试一下EAGAIN情况下，n的返回值
 			case syscall.EAGAIN:
 				c.wl[0].pos += n
-				break
+				return e
 			case nil:
 				// 测试一下，发送成功的情况下，是否有未完整发送的情况。理论上无
 				// 改成list
@@ -104,6 +110,9 @@ func (c *C) SendAgain() error {
 }
 
 func (c *C) Recv(buf []byte) (int, error) {
+	if c.Closed() {
+		return 0, os.ErrClosed
+	}
 	switch c.ss {
 	case ESTAB:
 		return syscall.Read(c.fd, buf)
