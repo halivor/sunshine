@@ -30,12 +30,14 @@ const (
 	A_CONSUME
 )
 
-var components map[MwId]interface{}
+type newCp func() Mwer
+
+var components map[MwId]newCp
 
 func init() {
-	components = make(map[MwId]interface{}, 64)
+	components = make(map[MwId]newCp, 64)
 }
 
-func Register(id MwId, New interface{}) {
+func Register(id MwId, New newCp) {
 	components[id] = New
 }

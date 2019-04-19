@@ -79,3 +79,6 @@ func (a *Acceptor) CallBack(ev uint32) {
 func (a *Acceptor) Event() uint32 {
 	return a.ev
 }
+
+func (a *Acceptor) Release() {
+}

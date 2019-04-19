@@ -12,32 +12,36 @@ type EventPool interface {
 	AddEvent(ev Event) error
 	ModEvent(ev Event) error
 	DelEvent(ev Event) error
-	Run()
-	Stop()
 }
 
 type eventpool struct {
 	fd   int
 	ev   []syscall.EpollEvent // 每次被唤醒，最大处理event数
-	ss   map[int]Event        // pool中的event
+	es   map[int]Event        // pool中的event
 	stop bool
 	*log.Logger
 }
 
-func init() {
+func New() (*eventpool, error) {
+	return newEp(nil)
 }
 
-func New() (EventPool, error) {
+func newEp(epo *eventpool) (*eventpool, error) {
 	fd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	switch e {
 	case nil:
-		return &eventpool{
-			fd:     fd,
-			ev:     make([]syscall.EpollEvent, cnf.MaxEvents),
-			ss:     make(map[int]Event, cnf.MaxConns),
-			stop:   false,
-			Logger: cnf.NewLogger(fmt.Sprintf("[ep(%d)] ", fd)),
-		}, nil
+		if epo == nil {
+			epo = &eventpool{
+				fd:     fd,
+				ev:     make([]syscall.EpollEvent, cnf.MaxEvents),
+				es:     make(map[int]Event, cnf.MaxConns),
+				stop:   false,
+				Logger: cnf.NewLogger(fmt.Sprintf("[ep(%d)] ", fd)),
+			}
+		} else {
+			epo.fd = fd
+			epo.Logger = cnf.NewLogger(fmt.Sprintf("[ep(%d)] ", fd))
+		}
 	default:
 		// EINVAL (epoll_create1()) Invalid value specified in flags.
 		// EMFILE The per-user limit on the number of epoll instances imposed by
@@ -50,12 +54,13 @@ func New() (EventPool, error) {
 		// ENOMEM There was insufficient memory to create the kernel object.
 		return nil, e
 	}
+	return epo, nil
 }
 
-func (m *eventpool) AddEvent(ev Event) error {
-	m.ss[ev.Fd()] = ev
-	m.Println("add event", ev.Fd(), ev.Event())
-	switch e := syscall.EpollCtl(m.fd,
+func (ep *eventpool) AddEvent(ev Event) error {
+	ep.es[ev.Fd()] = ev
+	ep.Println("add event", ev.Fd(), ev.Event())
+	switch e := syscall.EpollCtl(ep.fd,
 		syscall.EPOLL_CTL_ADD,
 		ev.Fd(),
 		&syscall.EpollEvent{
@@ -63,18 +68,19 @@ func (m *eventpool) AddEvent(ev Event) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
-	case syscall.EBADF, syscall.EEXIST, syscall.EINVAL,
+	case syscall.EBADF, syscall.EEXIST, syscall.EINVAL, syscall.ELOOP,
 		syscall.ENOMEM, syscall.ENOSPC, syscall.EPERM:
 		return e
 	default:
-		// 该epoll已不可用需要重建
+		// 不应该有其他错误信息
+		ep.Println(ev, e)
 		return e
 	}
 }
 
-func (m *eventpool) ModEvent(ev Event) error {
-	m.Println("mod event", ev.Fd(), ev.Event())
-	switch e := syscall.EpollCtl(m.fd,
+func (ep *eventpool) ModEvent(ev Event) error {
+	ep.Println("mod event", ev.Fd(), ev.Event())
+	switch e := syscall.EpollCtl(ep.fd,
 		syscall.EPOLL_CTL_MOD,
 		ev.Fd(),
 		&syscall.EpollEvent{
@@ -82,19 +88,20 @@ func (m *eventpool) ModEvent(ev Event) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
-	case syscall.EBADF, syscall.EINVAL, syscall.ENOENT,
-		syscall.ENOMEM, syscall.EPERM:
+	case syscall.EBADF, syscall.EINVAL, syscall.ELOOP, syscall.ENOENT,
+		syscall.ENOSPC, syscall.ENOMEM, syscall.EPERM:
 		return e
 	default:
-		// 该epoll已不可用需要重建
+		// 理论上不存在其他错误信息
+		ep.Println(ev, e)
 		return e
 	}
 }
 
-func (m *eventpool) DelEvent(ev Event) error {
-	m.Println("del event", ev.Fd(), ev.Event())
-	delete(m.ss, ev.Fd())
-	switch e := syscall.EpollCtl(m.fd,
+func (ep *eventpool) DelEvent(ev Event) error {
+	ep.Println("del event", ev.Fd(), ev.Event())
+	delete(ep.es, ev.Fd())
+	switch e := syscall.EpollCtl(ep.fd,
 		syscall.EPOLL_CTL_DEL,
 		ev.Fd(),
 		&syscall.EpollEvent{
@@ -102,24 +109,25 @@ func (m *eventpool) DelEvent(ev Event) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
-	case syscall.EBADF, syscall.EINVAL, syscall.ENOENT,
-		syscall.EEXIST, syscall.ENOSPC, syscall.EPERM:
+	case syscall.EBADF, syscall.EINVAL, syscall.ELOOP, syscall.ENOENT,
+		syscall.ENOSPC, syscall.ENOMEM, syscall.EPERM:
 		return e
 	default:
-		// 该epoll已不可用需要重建
+		// 理论上不存在其他错误信息
+		ep.Println(ev, e)
 		return e
 	}
 
 }
 
-func (m *eventpool) Run() {
-	for !m.stop {
-		switch n, e := syscall.EpollWait(m.fd, m.ev, 1000); e {
+func (ep *eventpool) Run() {
+	for !ep.stop {
+		switch n, e := syscall.EpollWait(ep.fd, ep.ev, cnf.EP_TIMEOUT); e {
 		case syscall.EINTR:
 		case nil:
 			for i := 0; i < n; i++ {
-				//m.Println(event[es[m.ev[i].Events]])
-				m.ss[int(m.ev[i].Fd)].CallBack(m.ev[i].Events)
+				//ep.Println(event[es[ep.ev[i].Events]])
+				ep.es[int(ep.ev[i].Fd)].CallBack(ep.ev[i].Events)
 			}
 		default:
 			// 该epoll已不可用需要重建
@@ -128,11 +136,38 @@ func (m *eventpool) Run() {
 			//        write permissions.
 			// EINVAL epfd is not an epoll file descriptor, or maxevents is less
 			//        than or equal to zero.
+
+			ep.Println("epoll wait error", e)
+			// 理论上不存在，若存在则直接重建
+			if e := ep.reNew(); e != nil {
+				ep.Println("ep run failed,", e)
+				return
+			}
 		}
 	}
-	m.Println("event pool stop")
+	ep.Println("event pool stop")
 }
 
-func (m *eventpool) Stop() {
-	m.stop = true
+func (ep *eventpool) Release() {
+	for _, ev := range ep.es {
+		ev.Release()
+	}
+}
+
+// TODO: 考虑细节
+func (ep *eventpool) reNew() error {
+	syscall.Close(ep.fd)
+	if _, e := newEp(ep); e != nil {
+		return e
+	}
+	for _, ev := range ep.es {
+		if e := ep.AddEvent(ev); e != nil {
+			ev.Release()
+		}
+	}
+	return nil
+}
+
+func (ep *eventpool) Stop() {
+	ep.stop = true
 }

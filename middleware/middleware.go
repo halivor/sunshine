@@ -20,10 +20,8 @@ type middleware struct {
 
 func New() *middleware {
 	cs := make(map[MwId]Mwer, 32)
-	for id, cm := range components {
-		if f, ok := cm.(func() Mwer); ok {
-			cs[id] = f()
-		}
+	for id, nc := range components {
+		cs[id] = nc()
 	}
 	return &middleware{
 		category: make(map[TypeID][]Consume),
