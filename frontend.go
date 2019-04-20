@@ -21,9 +21,9 @@ func main() {
 
 func newFrontend() {
 	defer func() {
-		if r := recover(); r != nil {
-			log.Println("panic =>", r)
-		}
+		/*if r := recover(); r != nil {*/
+		//log.Println("panic =>", r)
+		/*}*/
 		wg.Done()
 	}()
 	ep, e := evp.New()
@@ -31,7 +31,7 @@ func newFrontend() {
 		log.Println("new event pool failed:", e)
 	}
 	mws := mw.New()
-	if _, e := ac.NewTcpAcceptor("0.0.0.0:10000", ep, mws); e != nil {
+	if _, e := ac.NewTcpAcceptor("0.0.0.0:19981", ep, mws); e != nil {
 		log.Println("new acceptor failed:", e)
 	}
 	if _, e := ag.New("127.0.0.1:29981", ep, mws); e != nil {

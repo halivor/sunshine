@@ -68,14 +68,16 @@ func (ep *eventpool) AddEvent(ev Event) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
+	case nil:
 	case syscall.EBADF, syscall.EEXIST, syscall.EINVAL, syscall.ELOOP,
 		syscall.ENOMEM, syscall.ENOSPC, syscall.EPERM:
 		return e
 	default:
 		// 不应该有其他错误信息
-		ep.Println(ev, e)
+		ep.Println("event add", ev, e)
 		return e
 	}
+	return nil
 }
 
 func (ep *eventpool) ModEvent(ev Event) error {
@@ -88,14 +90,16 @@ func (ep *eventpool) ModEvent(ev Event) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
+	case nil:
 	case syscall.EBADF, syscall.EINVAL, syscall.ELOOP, syscall.ENOENT,
 		syscall.ENOSPC, syscall.ENOMEM, syscall.EPERM:
 		return e
 	default:
 		// 理论上不存在其他错误信息
-		ep.Println(ev, e)
+		ep.Println("event mod", ev, e)
 		return e
 	}
+	return nil
 }
 
 func (ep *eventpool) DelEvent(ev Event) error {
@@ -109,15 +113,16 @@ func (ep *eventpool) DelEvent(ev Event) error {
 			Fd:     int32(ev.Fd()),
 		},
 	); e {
+	case nil:
 	case syscall.EBADF, syscall.EINVAL, syscall.ELOOP, syscall.ENOENT,
 		syscall.ENOSPC, syscall.ENOMEM, syscall.EPERM:
 		return e
 	default:
 		// 理论上不存在其他错误信息
-		ep.Println(ev, e)
+		ep.Println("event del", ev, e)
 		return e
 	}
-
+	return nil
 }
 
 func (ep *eventpool) Run() {

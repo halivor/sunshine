@@ -39,6 +39,7 @@ func Release(buffer []byte) {
 // length <= 4K
 // length >= 4M
 func (bp *BufferPool) Alloc() []byte {
+	return make([]byte, config.BUF_MIN_LEN)
 	if bp.idle.Len() > 0 {
 		if buffer, ok := bp.idle.Remove(bp.idle.Front()).([]byte); ok {
 			return buffer

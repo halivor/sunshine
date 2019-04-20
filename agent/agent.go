@@ -93,8 +93,9 @@ func (a *Agent) Release() {
 
 func (a *Agent) Consume(message interface{}) interface{} {
 	if msg, ok := message.([]byte); ok {
-		a.Produce(m.T_CHAT, a.cqid, msg)
-		a.Produce(m.T_BULLET, a.bqid, msg)
+		/*a.Produce(m.T_CHAT, a.cqid, msg)*/
+		/*a.Produce(m.T_BULLET, a.bqid, msg)*/
+		a.Println(string(msg))
 	}
 	return nil
 }

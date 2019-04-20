@@ -52,21 +52,27 @@ func (p *Peer) CallBack(ev uint32) {
 	for {
 		switch {
 		case ev&syscall.EPOLLIN != 0:
-			if n, e := syscall.Read(p.Fd(), p.rb[p.pos:]); e != nil || n == 0 {
+			n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
+			p.Println("callback------")
+			switch e {
+			case nil:
 				p.pos += n
 				// 头长度不够，继续读取
 				if p.pos < pkt.HLen+pkt.UHLen {
+					p.Println("not enough")
 					return
 				}
-				switch e {
-				case syscall.EAGAIN:
-					return
-				default:
-					p.Release()
-					return
-				}
+				p.Println(p.pos, n, p.rb[pkt.HLen:p.pos])
+			case syscall.EAGAIN:
+				return
+			default:
+				p.Release()
+				return
 			}
-			p.Do()
+			if e := p.Process(); e != nil {
+				p.Println(e)
+				p.Release()
+			}
 		case ev&syscall.EPOLLERR != 0:
 			p.Release()
 		case ev&syscall.EPOLLOUT != 0:
@@ -80,7 +86,7 @@ func (p *Peer) CallBack(ev uint32) {
 	}
 }
 
-func (p *Peer) Do() error {
+func (p *Peer) Process() error {
 	switch p.ps {
 	case PS_ESTAB:
 		if e := p.check(); e != nil {
@@ -88,22 +94,11 @@ func (p *Peer) Do() error {
 		}
 		// 用户信息结构
 		p.Manager.Add(p)
-		for {
-			packet, e := p.Parse()
-			if e != nil {
-				return e
-			}
-			p.Manager.Transfer(packet)
-		}
+		return p.Transfer()
 	case PS_NORMAL:
-		for {
-			packet, e := p.Parse()
-			if e != nil {
-				return e
-			}
-			p.Manager.Transfer(packet)
-		}
+		return p.Transfer()
 	}
+	p.Println("done")
 	return nil
 }
 
@@ -117,6 +112,7 @@ func (p *Peer) check() error {
 	p.ps = PS_NORMAL
 	p.Header = *(*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	// verify failed os.ErrInvalid
+	p.Println("checked", h, uh)
 	return nil
 }
 
@@ -148,6 +144,17 @@ func (p *Peer) Event() uint32 {
 func (p *Peer) Release() {
 	syscall.Close(p.Fd())
 	p.DelEvent(p)
+}
+
+func (p *Peer) Transfer() error {
+	for p.pos > pkt.HLen+pkt.UHLen {
+		packet, e := p.Parse()
+		if e != nil {
+			return e
+		}
+		p.Manager.Transfer(packet)
+	}
+	return nil
 }
 
 func (p *Peer) Send(data []byte) {
