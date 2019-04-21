@@ -69,12 +69,13 @@ func (pm *manager) broadcast(message []byte) {
 
 func (pm *manager) Consume(message interface{}) interface{} {
 	if buf, ok := message.([]byte); ok {
-		uh := (*pkt.UHeader)(unsafe.Pointer(&buf[pkt.HLen]))
-		switch uh.Ver {
+		u := (*pkt.SHeader)(unsafe.Pointer(&buf[pkt.HLen]))
+		h := (*pkt.Header)(unsafe.Pointer(&buf[0]))
+		switch u.Cmd() {
 		case 1:
 			pm.broadcast(buf)
 		case 3:
-			pm.unicast(uh.Uid, buf)
+			pm.unicast(h.Uid, buf)
 		}
 
 	}
@@ -82,6 +83,8 @@ func (pm *manager) Consume(message interface{}) interface{} {
 }
 
 func (pm *manager) Transfer(message []byte) {
-	pm.Println("produce", string(message))
-	pm.Produce(mw.T_TRANSFER, pm.uqid, message)
+	if message != nil {
+		pm.Println("produce", string(message))
+		pm.Produce(mw.T_TRANSFER, pm.uqid, message)
+	}
 }

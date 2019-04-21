@@ -7,7 +7,8 @@ import (
 type Type int8
 
 const (
-	T_STRING Type = 1 << iota
+	T_AUTH Type = 1 + iota
+	T_STRING
 	T_BINARY
 	T_RPOTO
 )
@@ -17,32 +18,18 @@ type Header struct {
 	Nid uint16 // node id
 	Uid uint32 // user id
 	Cid uint32 // user type
-	Res [64]byte
+	Res [20]byte
 }
 
 type UHeader interface {
-	Ver() uint16
-	Cmd() uint16
-	Uid() uint32
-	Cid() uint32
-	Len() uint32
+	Ver() int
+	Cmd() int
+	Seq() int
+	Len() int
 }
 
 const (
 	HLen  = int(unsafe.Sizeof(Header{}))
-	BHLen = int(unsafe.Sizeof(BHeader{}))
+	ALen  = int(unsafe.Sizeof(Auth{}))
 	SHLen = int(unsafe.Sizeof(SHeader{}))
 )
-
-func Parse(data []byte) (UHeader, error) {
-	pt := data[HLen]
-	switch pt {
-	case 'B':
-		h := (*BHeader)(unsafe.Pointer(nil))
-		return h.Parse()
-	case 'J':
-		h := (*SHeader)(unsafe.Pointer(nil))
-		return h.Parse()
-	}
-	return nil, nil
-}

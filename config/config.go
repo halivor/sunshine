@@ -46,5 +46,5 @@ func Usec() int64 {
 	return now.UnixNano()
 }
 func NewLogger(prefix string) *log.Logger {
-	return log.New(os.Stderr, prefix, log.LstdFlags)
+	return log.New(os.Stderr, prefix, log.LstdFlags|log.Lshortfile)
 }

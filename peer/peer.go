@@ -52,26 +52,23 @@ func (p *Peer) CallBack(ev uint32) {
 	for {
 		switch {
 		case ev&syscall.EPOLLIN != 0:
+			p.Println("callback------", p.pos)
 			n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
-			p.Println("callback------")
 			switch e {
 			case nil:
-				p.pos += n
-				// 头长度不够，继续读取
-				if p.pos < pkt.HLen+pkt.UHLen {
-					p.Println("not enough")
+				if n == 0 {
+					p.Release()
 					return
 				}
-				p.Println(p.pos, n, p.rb[pkt.HLen:p.pos])
+				p.pos += n
+				if e := p.Process(); e != nil {
+					p.Release()
+				}
 			case syscall.EAGAIN:
 				return
 			default:
 				p.Release()
 				return
-			}
-			if e := p.Process(); e != nil {
-				p.Println(e)
-				p.Release()
 			}
 		case ev&syscall.EPOLLERR != 0:
 			p.Release()
@@ -86,55 +83,109 @@ func (p *Peer) CallBack(ev uint32) {
 	}
 }
 
-func (p *Peer) Process() error {
+func (p *Peer) Process() (e error) {
 	switch p.ps {
 	case PS_ESTAB:
-		if e := p.check(); e != nil {
+		p.Println("estab", p.pos, string(p.rb[pkt.HLen:p.pos]))
+		// 头长度不够，继续读取
+		if p.pos < pkt.HLen+pkt.ALen {
+			p.Println("not enough")
+			return
+		}
+		ul, e := p.check()
+		if e != nil {
 			return e
 		}
 		// 用户信息结构
 		p.Manager.Add(p)
-		return p.Transfer()
+		// 转发packet消息
+		packet := p.rb[:pkt.HLen+pkt.ALen+ul]
+
+		nb := bp.Alloc()
+		rl := p.pos - len(packet)
+		if rl > 0 {
+			copy(nb[pkt.HLen:], p.rb[len(packet):p.pos])
+		}
+
+		p.rb = nb
+		*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
+		p.pos = pkt.HLen + rl
+		p.Transfer(packet)
 	case PS_NORMAL:
-		return p.Transfer()
+		for {
+			p.Println("normal", p.pos, string(p.rb[pkt.HLen:p.pos]))
+			if p.pos < pkt.HLen+pkt.SHLen {
+				break
+			}
+			packet, e := p.Parse()
+			if e != nil {
+				return e
+			}
+			p.Transfer(packet)
+		}
 	}
-	p.Println("done")
+
+	p.Println("done", p.pos)
 	return nil
 }
 
-func (p *Peer) check() error {
+func (p *Peer) check() (len int, e error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("check =>", r)
+			e = os.ErrInvalid
+		}
+	}()
 	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
-	uh := (*pkt.UHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
-	h.Ver = cnf.VER
+	a := (*pkt.Auth)(unsafe.Pointer(&p.rb[pkt.HLen]))
+	h.Ver = uint16(a.Ver())
 	h.Nid = cnf.NodeId
-	h.Uid = uh.Uid
-	h.Cid = uh.Cid
+	h.Uid = uint32(a.Uid())
+	h.Cid = uint32(a.Cid())
 	p.ps = PS_NORMAL
 	p.Header = *(*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	// verify failed os.ErrInvalid
-	p.Println("checked", h, uh)
-	return nil
+	p.Println("checked", h, a)
+	return a.Len(), nil
 }
 
-func (p *Peer) Parse() ([]byte, error) {
-	uh := (*pkt.UHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
-	if uh.Len > 4*1024 {
+func (p *Peer) Parse() (packet []byte, e error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("parse =>", r)
+			e = os.ErrInvalid
+		}
+	}()
+	h := (*pkt.SHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
+	if h.Len() > 4*1024 {
 		return nil, os.ErrInvalid
 	}
-	if pkt.HLen+pkt.UHLen+int(uh.Len) < p.pos {
-		return nil, syscall.EAGAIN
+	p.Println("parse", h.Len())
+	plen := pkt.HLen + pkt.SHLen + h.Len()
+	if plen > p.pos {
+		return nil, nil
 	}
-	packet := p.rb[:pkt.HLen+pkt.UHLen+int(uh.Len)]
+	packet = p.rb[:plen]
 	nb := bp.Alloc()
 
-	if p.pos-pkt.HLen+pkt.UHLen+int(uh.Len) > 0 {
-		copy(nb[pkt.HLen:], p.rb[pkt.HLen+pkt.UHLen+int(uh.Len):p.pos])
+	rl := p.pos - plen
+	if rl > 0 {
+		copy(nb[pkt.HLen:], p.rb[plen:p.pos])
 	}
 
 	p.rb = nb
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
-	p.pos = pkt.HLen
+	p.pos = pkt.HLen + rl
+	p.Println("parse end", p.pos)
 	return packet, nil
+}
+
+func (p *Peer) Send(data []byte) {
+	switch e := p.Conn.Send(data); e {
+	case syscall.EAGAIN:
+		p.ev |= syscall.EPOLLOUT
+		p.ModEvent(p)
+	}
 }
 
 func (p *Peer) Event() uint32 {
@@ -144,23 +195,4 @@ func (p *Peer) Event() uint32 {
 func (p *Peer) Release() {
 	syscall.Close(p.Fd())
 	p.DelEvent(p)
-}
-
-func (p *Peer) Transfer() error {
-	for p.pos > pkt.HLen+pkt.UHLen {
-		packet, e := p.Parse()
-		if e != nil {
-			return e
-		}
-		p.Manager.Transfer(packet)
-	}
-	return nil
-}
-
-func (p *Peer) Send(data []byte) {
-	switch e := p.Conn.Send(data); e {
-	case syscall.EAGAIN:
-		p.ev |= syscall.EPOLLOUT
-		p.ModEvent(p)
-	}
 }

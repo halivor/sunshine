@@ -1,29 +1,45 @@
 package packet
 
+import (
+	"log"
+	"strconv"
+)
+
 type SHeader struct {
 	ver [4]byte
 	cmd [4]byte
-	uid [8]byte
-	cid [8]byte
-	len [8]byte
 	seq [8]byte
+	len [4]byte
 }
 
-func (h *SHeader) Parse() (UHeader, error) {
-	return nil, nil
+func (h *SHeader) Ver() int {
+	v, e := strconv.Atoi(string(h.ver[:]))
+	if e != nil {
+		log.Panicln(e)
+	}
+	return v
 }
-func (h *SHeader) Ver() uint16 {
-	return 0
+
+func (h *SHeader) Cmd() int {
+	c, e := strconv.Atoi(string(h.cmd[:]))
+	if e != nil {
+		log.Panicln(e)
+	}
+	return c
 }
-func (h *SHeader) Cmd() uint16 {
-	return 0
+
+func (h *SHeader) Seq() int {
+	s, e := strconv.Atoi(string(h.seq[:]))
+	if e != nil {
+		log.Panicln(e)
+	}
+	return s
 }
-func (h *SHeader) Uid() uint32 {
-	return 0
-}
-func (h *SHeader) Cid() uint32 {
-	return 0
-}
-func (h *SHeader) Len() uint32 {
-	return 0
+
+func (h *SHeader) Len() int {
+	l, e := strconv.Atoi(string(h.len[:]))
+	if e != nil {
+		log.Panicln(e)
+	}
+	return l
 }
