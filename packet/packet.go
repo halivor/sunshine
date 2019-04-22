@@ -18,7 +18,9 @@ type Header struct {
 	Nid uint16 // node id
 	Uid uint32 // user id
 	Cid uint32 // user type
-	Res [20]byte
+	Cmd uint32
+	Len uint32
+	Res [12]byte
 }
 
 type UHeader interface {

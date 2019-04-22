@@ -7,9 +7,9 @@ import (
 
 	"github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
-	e "github.com/halivor/frontend/eventpool"
-	m "github.com/halivor/frontend/middleware"
 	p "github.com/halivor/frontend/peer"
+	e "github.com/halivor/goevent/eventpool"
+	m "github.com/halivor/goevent/middleware"
 )
 
 type Acceptor struct {

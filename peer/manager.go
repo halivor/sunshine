@@ -5,8 +5,8 @@ import (
 	"unsafe"
 
 	cnf "github.com/halivor/frontend/config"
-	mw "github.com/halivor/frontend/middleware"
 	pkt "github.com/halivor/frontend/packet"
+	mw "github.com/halivor/goevent/middleware"
 )
 
 type Manager interface {

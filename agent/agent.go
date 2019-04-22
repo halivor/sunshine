@@ -5,18 +5,21 @@ import (
 	"log"
 	"net"
 	"syscall"
+	"unsafe"
 
 	bp "github.com/halivor/frontend/bufferpool"
 	cnf "github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
-	evp "github.com/halivor/frontend/eventpool"
-	m "github.com/halivor/frontend/middleware"
+	pkt "github.com/halivor/frontend/packet"
+	evp "github.com/halivor/goevent/eventpool"
+	m "github.com/halivor/goevent/middleware"
 )
 
 type Agent struct {
 	addr string
 	ev   uint32
 	buf  []byte
+	pos  int
 
 	*c.C
 	evp.EventPool
@@ -76,7 +79,7 @@ func (a *Agent) CallBack(ev uint32) {
 		if e != nil {
 			a.Release()
 		}
-		a.Println("produce", string(a.buf[:n]))
+		//a.pos += n
 		a.Produce(m.T_TRANSFER, a.tqid, a.buf[:n])
 	case ev&syscall.EPOLLOUT != 0:
 	case ev&syscall.EPOLLERR != 0:
@@ -91,11 +94,18 @@ func (a *Agent) Event() uint32 {
 func (a *Agent) Release() {
 }
 
+/*func (a *Agent) Produce(message []byte) interface{} {*/
+//a.Middleware.Produce(m.T_TRANSFER, a.tqid, a.buf[:a.pos])
+/*}*/
 func (a *Agent) Consume(message interface{}) interface{} {
 	if msg, ok := message.([]byte); ok {
-		/*a.Produce(m.T_CHAT, a.cqid, msg)*/
-		/*a.Produce(m.T_BULLET, a.bqid, msg)*/
-		a.Println(string(msg))
+		switch h := (*pkt.Header)(unsafe.Pointer(&msg[0])); h.Cmd {
+		case 2000:
+			//a.Produce(m.T_CHAT, a.cqid, msg)
+		case 4000:
+			//a.Produce(m.T_BULLET, a.bqid, msg)
+		}
+		a.Println(string(msg[pkt.HLen:]))
 	}
 	return nil
 }

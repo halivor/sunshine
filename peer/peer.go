@@ -10,8 +10,8 @@ import (
 	bp "github.com/halivor/frontend/bufferpool"
 	cnf "github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
-	evp "github.com/halivor/frontend/eventpool"
 	pkt "github.com/halivor/frontend/packet"
+	evp "github.com/halivor/goevent/eventpool"
 )
 
 type uinfo struct {
@@ -92,7 +92,7 @@ func (p *Peer) Process() (e error) {
 			p.Println("not enough")
 			return
 		}
-		ul, e := p.check()
+		ul, e := p.Auth()
 		if e != nil {
 			return e
 		}
@@ -129,7 +129,7 @@ func (p *Peer) Process() (e error) {
 	return nil
 }
 
-func (p *Peer) check() (len int, e error) {
+func (p *Peer) Auth() (len int, e error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("check =>", r)
@@ -156,12 +156,14 @@ func (p *Peer) Parse() (packet []byte, e error) {
 			e = os.ErrInvalid
 		}
 	}()
-	h := (*pkt.SHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
-	if h.Len() > 4*1024 {
+	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
+	sh := (*pkt.SHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
+	if sh.Len() > 4*1024 {
 		return nil, os.ErrInvalid
 	}
-	p.Println("parse", h.Len())
-	plen := pkt.HLen + pkt.SHLen + h.Len()
+	h.Cmd = uint32(sh.Cmd())
+	h.Len = uint32(pkt.SHLen + sh.Len())
+	plen := pkt.HLen + pkt.SHLen + sh.Len()
 	if plen > p.pos {
 		return nil, nil
 	}
