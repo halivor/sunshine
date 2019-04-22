@@ -8,7 +8,7 @@ import (
 
 type BufferPool struct {
 	idle  *list.List
-	large map[uint32]*list.List
+	large map[int]*list.List
 }
 
 var gbp *BufferPool
@@ -16,7 +16,7 @@ var gbp *BufferPool
 func init() {
 	gbp = &BufferPool{
 		idle:  list.New(),
-		large: make(map[uint32]*list.List),
+		large: make(map[int]*list.List),
 	}
 }
 
@@ -28,7 +28,7 @@ func Alloc() []byte {
 	return gbp.Alloc()
 }
 
-func AllocLarge(length uint32) []byte {
+func AllocLarge(length int) []byte {
 	return gbp.AllocLarge(length)
 }
 
@@ -48,7 +48,7 @@ func (bp *BufferPool) Alloc() []byte {
 	return make([]byte, config.BUF_MIN_LEN)
 }
 
-func (bp *BufferPool) AllocLarge(length uint32) []byte {
+func (bp *BufferPool) AllocLarge(length int) []byte {
 	if length <= config.BUF_MIN_LEN {
 		return bp.Alloc()
 	}

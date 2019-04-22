@@ -6,9 +6,9 @@ import (
 
 	ac "github.com/halivor/frontend/acceptor"
 	ag "github.com/halivor/frontend/agent"
+	_ "github.com/halivor/frontend/transfer"
 	evp "github.com/halivor/goevent/eventpool"
 	mw "github.com/halivor/goevent/middleware"
-	_ "github.com/halivor/goevent/middleware/transfer"
 )
 
 var wg sync.WaitGroup

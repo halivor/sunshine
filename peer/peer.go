@@ -52,7 +52,6 @@ func (p *Peer) CallBack(ev uint32) {
 	for {
 		switch {
 		case ev&syscall.EPOLLIN != 0:
-			p.Println("callback------", p.pos)
 			n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
 			switch e {
 			case nil:
@@ -61,7 +60,9 @@ func (p *Peer) CallBack(ev uint32) {
 					return
 				}
 				p.pos += n
-				if e := p.Process(); e != nil {
+				switch e := p.Process(); e {
+				case nil, syscall.EAGAIN:
+				default:
 					p.Release()
 				}
 			case syscall.EAGAIN:
@@ -88,35 +89,12 @@ func (p *Peer) Process() (e error) {
 	case PS_ESTAB:
 		p.Println("estab", p.pos, string(p.rb[pkt.HLen:p.pos]))
 		// 头长度不够，继续读取
-		if p.pos < pkt.HLen+pkt.ALen {
-			p.Println("not enough")
-			return
-		}
-		ul, e := p.Auth()
-		if e != nil {
+		if e = p.Auth(); e != nil {
 			return e
 		}
-		// 用户信息结构
-		p.Manager.Add(p)
-		// 转发packet消息
-		packet := p.rb[:pkt.HLen+pkt.ALen+ul]
-
-		nb := bp.Alloc()
-		rl := p.pos - len(packet)
-		if rl > 0 {
-			copy(nb[pkt.HLen:], p.rb[len(packet):p.pos])
-		}
-
-		p.rb = nb
-		*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
-		p.pos = pkt.HLen + rl
-		p.Transfer(packet)
 	case PS_NORMAL:
 		for {
-			p.Println("normal", p.pos, string(p.rb[pkt.HLen:p.pos]))
-			if p.pos < pkt.HLen+pkt.SHLen {
-				break
-			}
+			//p.Println("normal", p.pos, string(p.rb[pkt.HLen:p.pos]))
 			packet, e := p.Parse()
 			if e != nil {
 				return e
@@ -125,19 +103,24 @@ func (p *Peer) Process() (e error) {
 		}
 	}
 
-	p.Println("done", p.pos)
+	//p.Println("done", p.pos)
 	return nil
 }
 
-func (p *Peer) Auth() (len int, e error) {
+func (p *Peer) Auth() (e error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("check =>", r)
 			e = os.ErrInvalid
 		}
 	}()
-	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	a := (*pkt.Auth)(unsafe.Pointer(&p.rb[pkt.HLen]))
+	if p.pos < pkt.HLen+pkt.ALen || p.pos < pkt.HLen+pkt.ALen+a.Len() {
+		p.Println("not enough")
+		return syscall.EAGAIN
+	}
+
+	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	h.Ver = uint16(a.Ver())
 	h.Nid = cnf.NodeId
 	h.Uid = uint32(a.Uid())
@@ -145,8 +128,25 @@ func (p *Peer) Auth() (len int, e error) {
 	p.ps = PS_NORMAL
 	p.Header = *(*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	// verify failed os.ErrInvalid
-	p.Println("checked", h, a)
-	return a.Len(), nil
+
+	// 用户信息结构
+	p.Add(p)
+
+	// 转发packet消息
+	packet := p.rb[:pkt.HLen+pkt.ALen+a.Len()]
+	if p.pos > pkt.HLen+pkt.ALen+a.Len() {
+		nb := bp.Alloc()
+		copy(nb[pkt.HLen:], p.rb[len(packet):p.pos])
+		p.rb = nb
+		p.pos = pkt.HLen + p.pos - len(packet)
+	} else {
+		p.rb = bp.Alloc()
+		p.pos = pkt.HLen
+	}
+	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
+	p.Transfer(packet)
+
+	return nil
 }
 
 func (p *Peer) Parse() (packet []byte, e error) {
@@ -156,8 +156,12 @@ func (p *Peer) Parse() (packet []byte, e error) {
 			e = os.ErrInvalid
 		}
 	}()
-	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	sh := (*pkt.SHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
+	if p.pos < pkt.HLen+pkt.SHLen || p.pos < pkt.HLen+pkt.SHLen+sh.Len() {
+		return nil, syscall.EAGAIN
+	}
+
+	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	if sh.Len() > 4*1024 {
 		return nil, os.ErrInvalid
 	}
@@ -178,7 +182,7 @@ func (p *Peer) Parse() (packet []byte, e error) {
 	p.rb = nb
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
 	p.pos = pkt.HLen + rl
-	p.Println("parse end", p.pos)
+	//p.Println("parse end", p.pos)
 	return packet, nil
 }
 

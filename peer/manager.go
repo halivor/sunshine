@@ -29,6 +29,8 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 	defer func() {
 		pm.uqid = pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
 		pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
+		pm.Bind(mw.T_TRANSFER, "dchat", mw.A_CONSUME, pm)
+		pm.Bind(mw.T_TRANSFER, "dbullet", mw.A_CONSUME, pm)
 	}()
 	return &manager{
 		peers:      make(map[uint32]*Peer),
@@ -68,14 +70,19 @@ func (pm *manager) broadcast(message []byte) {
 }
 
 func (pm *manager) Consume(message interface{}) interface{} {
-	if buf, ok := message.([]byte); ok {
-		u := (*pkt.SHeader)(unsafe.Pointer(&buf[pkt.HLen]))
-		h := (*pkt.Header)(unsafe.Pointer(&buf[0]))
+	if data, ok := message.([]byte); ok {
+		u := (*pkt.SHeader)(unsafe.Pointer(&data[pkt.HLen]))
+		h := (*pkt.Header)(unsafe.Pointer(&data[0]))
 		switch u.Cmd() {
-		case 1:
-			pm.broadcast(buf)
-		case 3:
-			pm.unicast(h.Uid, buf)
+		case pkt.C_BULLET:
+			pm.Println("consume bullet", string(data[pkt.HLen:]))
+			pm.broadcast(data)
+		case pkt.C_CHAT:
+			pm.Println("consume chat", string(data[pkt.HLen:]))
+			pm.unicast(h.Uid, data)
+		default:
+			pm.Println("consume default", string(data[pkt.HLen:]))
+			pm.Println(string(data[pkt.HLen:]))
 		}
 
 	}

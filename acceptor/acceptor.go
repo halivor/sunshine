@@ -63,7 +63,7 @@ func (a *Acceptor) CallBack(ev uint32) {
 		a.DelEvent(a)
 		return
 	}
-	switch fd, _, e := syscall.Accept(a.Fd()); e {
+	switch fd, _, e := syscall.Accept4(a.Fd(), syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC); e {
 	case syscall.EAGAIN, syscall.EINTR:
 	case nil:
 		a.Println("accept connection", fd)
