@@ -91,7 +91,7 @@ func (a *Agent) CallBack(ev uint32) {
 func (a *Agent) Process() {
 	h := (*pkt.Header)(unsafe.Pointer(&a.buf[0]))
 	u := (*pkt.SHeader)(unsafe.Pointer(&a.buf[pkt.HLen]))
-	a.Println("process", a.buf[:a.pos])
+	//a.Println("process", a.buf[:a.pos])
 	if a.pos < pkt.HLen+pkt.SHLen || a.pos < pkt.HLen+pkt.SHLen+u.Len() {
 		if a.pos == cap(a.buf) {
 			buf := bp.AllocLarge(cap(a.buf) * 2)
@@ -102,7 +102,7 @@ func (a *Agent) Process() {
 	}
 	switch h.Cmd {
 	case pkt.C_BULLET:
-		a.Println("bullet", a.pos, string(a.buf[pkt.HLen:a.pos]))
+		//a.Println("bullet", a.pos, string(a.buf[pkt.HLen:a.pos]))
 		a.Produce(m.T_TRANSFER, a.cqid, a.buf[:a.pos])
 	case pkt.C_CHAT:
 		a.Println("chat", a.pos, string(a.buf[pkt.HLen:a.pos]))

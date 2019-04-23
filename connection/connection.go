@@ -1,7 +1,6 @@
 package connection
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,10 +12,6 @@ import (
 
 const (
 	MAX_SENDQ_SIZE = 32 // 超过队列，写入报错
-)
-
-var (
-	eclosed = errors.New("socket has been closed")
 )
 
 type Conn interface {
@@ -41,6 +36,8 @@ type C struct {
 }
 
 func NewConn(fd int) *C {
+	SetSndBuf(fd, 64*1024)
+	SetRcvBuf(fd, 64*1024)
 	return &C{
 		fd:     fd,
 		ss:     ESTAB,
@@ -54,6 +51,8 @@ func NewTcpConn() (*C, error) {
 	if e != nil {
 		return nil, e
 	}
+	SetSndBuf(fd, 64*1024)
+	SetRcvBuf(fd, 64*1024)
 	return &C{
 		fd:     fd,
 		ss:     CREATE,
@@ -63,10 +62,11 @@ func NewTcpConn() (*C, error) {
 }
 
 func (c *C) Send(message []byte) error {
-	if c.Closed() {
+	if c.Closed() || len(c.wl) >= MAX_SENDQ_SIZE {
 		return os.ErrClosed
 	}
 	if len(c.wl) > 0 {
+		c.Println("append", len(message), "bytes")
 		c.wl = append(c.wl, &packet{
 			buf: message,
 			pos: 0,
@@ -74,8 +74,12 @@ func (c *C) Send(message []byte) error {
 		return nil
 	}
 	n, e := syscall.Write(c.fd, message)
+	c.Println("write", n, "bytes", e)
 	if e == syscall.EAGAIN {
 		//bp.Release(message)
+		if n < 0 {
+			n = 0
+		}
 		c.wl = append(c.wl, &packet{
 			buf: message,
 			pos: n,

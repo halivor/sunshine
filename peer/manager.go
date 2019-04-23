@@ -42,6 +42,7 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 
 func (pm *manager) Add(p *Peer) {
 	// 超时重连
+	pm.Println("add", p.Uid)
 	if pp, ok := pm.peers[p.Uid]; ok {
 		pp.Release()
 	}
@@ -58,14 +59,14 @@ func (pm *manager) Del(p *Peer) {
 }
 
 func (pm *manager) unicast(uid uint32, message []byte) {
-	if up, ok := pm.peers[uid]; ok {
-		up.Send(message)
+	if u, ok := pm.peers[uid]; ok {
+		u.Send(message[pkt.HLen:])
 	}
 }
 
 func (pm *manager) broadcast(message []byte) {
 	for _, p := range pm.peers {
-		p.Send(message)
+		p.Send(message[pkt.HLen:])
 	}
 }
 
@@ -75,7 +76,7 @@ func (pm *manager) Consume(message interface{}) interface{} {
 		h := (*pkt.Header)(unsafe.Pointer(&data[0]))
 		switch u.Cmd() {
 		case pkt.C_BULLET:
-			pm.Println("consume bullet", string(data[pkt.HLen:]))
+			//pm.Println("consume bullet", string(data[pkt.HLen:]))
 			pm.broadcast(data)
 		case pkt.C_CHAT:
 			pm.Println("consume chat", string(data[pkt.HLen:]))

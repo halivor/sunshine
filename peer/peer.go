@@ -52,6 +52,7 @@ func (p *Peer) CallBack(ev uint32) {
 	for {
 		switch {
 		case ev&syscall.EPOLLIN != 0:
+			p.Println("ev in ------")
 			n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
 			switch e {
 			case nil:
@@ -72,14 +73,18 @@ func (p *Peer) CallBack(ev uint32) {
 				return
 			}
 		case ev&syscall.EPOLLERR != 0:
+			p.Println("ev err ------")
 			p.Release()
 		case ev&syscall.EPOLLOUT != 0:
+			p.Println("ev out ------")
 			if e := p.SendAgain(); e == nil {
 				p.ev = syscall.EPOLLIN
 				p.ModEvent(p)
 			} else if e == os.ErrClosed {
 				p.Release()
 			}
+		default:
+			p.Println("ev %d ------", ev)
 		}
 	}
 }
@@ -113,6 +118,8 @@ func (p *Peer) Auth() (e error) {
 			log.Println("check =>", r)
 			e = os.ErrInvalid
 		}
+		// 用户信息结构
+		p.Add(p)
 	}()
 	a := (*pkt.Auth)(unsafe.Pointer(&p.rb[pkt.HLen]))
 	if p.pos < pkt.HLen+pkt.ALen || p.pos < pkt.HLen+pkt.ALen+a.Len() {
@@ -128,9 +135,6 @@ func (p *Peer) Auth() (e error) {
 	p.ps = PS_NORMAL
 	p.Header = *(*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	// verify failed os.ErrInvalid
-
-	// 用户信息结构
-	p.Add(p)
 
 	// 转发packet消息
 	packet := p.rb[:pkt.HLen+pkt.ALen+a.Len()]
@@ -201,4 +205,5 @@ func (p *Peer) Event() uint32 {
 func (p *Peer) Release() {
 	syscall.Close(p.Fd())
 	p.DelEvent(p)
+	p.Del(p)
 }

@@ -36,6 +36,7 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, 
 	if e != nil {
 		return nil, e
 	}
+	log.Println("reuse addr port", c.Reuse(C.Fd(), true))
 	if e = syscall.Bind(C.Fd(), saddr); e != nil {
 		return nil, e
 	}
@@ -52,7 +53,6 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, 
 		Logger:    config.NewLogger(fmt.Sprintf("[accept(%d)] ", C.Fd())),
 	}
 
-	a.Println("reuse addr port", c.Reuse(C.Fd(), true))
 	return a, nil
 }
 

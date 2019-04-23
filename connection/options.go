@@ -4,7 +4,7 @@ import (
 	"syscall"
 )
 
-func KeepAlive(fd int) error {
+func SetKeepAlive(fd int) error {
 	if e := syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_KEEPALIVE, 1); e != nil {
 		return e
 	}
@@ -32,11 +32,19 @@ func Reuse(fd int, reusePort bool) error {
 	return nil
 }
 
-func NoDelay(fd int) error {
+func SetNoDelay(fd int) error {
 	return syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.TCP_NODELAY, 1)
 }
 
 // TODO: 确认Linger情况下，close对于Block和NonBlock socket的影响
-func Linger(fd int) error {
+func SetLinger(fd int) error {
 	return syscall.SetsockoptLinger(fd, syscall.SOL_SOCKET, syscall.SO_LINGER, &syscall.Linger{Onoff: 1, Linger: 3})
+}
+
+func SetSndBuf(fd int, length int) error {
+	return syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_SNDBUF, length)
+}
+
+func SetRcvBuf(fd int, length int) error {
+	return syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, length)
 }
