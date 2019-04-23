@@ -36,7 +36,7 @@ type C struct {
 }
 
 func NewConn(fd int) *C {
-	SetSndBuf(fd, 64*1024)
+	SetSndBuf(fd, 6*1024)
 	SetRcvBuf(fd, 64*1024)
 	return &C{
 		fd:     fd,
@@ -66,7 +66,7 @@ func (c *C) Send(message []byte) error {
 		return os.ErrClosed
 	}
 	if len(c.wl) > 0 {
-		c.Println("append", len(message), "bytes")
+		//c.Println("append", len(message), "bytes")
 		c.wl = append(c.wl, &packet{
 			buf: message,
 			pos: 0,
@@ -74,7 +74,7 @@ func (c *C) Send(message []byte) error {
 		return nil
 	}
 	n, e := syscall.Write(c.fd, message)
-	c.Println("write", n, "bytes", e)
+	//c.Println("write", n, "bytes", e)
 	if e == syscall.EAGAIN {
 		//bp.Release(message)
 		if n < 0 {
@@ -92,22 +92,26 @@ func (c *C) SendAgain() error {
 	if c.Closed() {
 		return os.ErrClosed
 	}
-	for {
-		if len(c.wl) > 0 {
-			switch n, e := syscall.Write(c.fd, c.wl[0].buf[c.wl[0].pos:]); e {
-			// 测试一下EAGAIN情况下，n的返回值
-			case syscall.EAGAIN:
+	for len(c.wl) > 0 {
+		switch n, e := syscall.Write(c.fd, c.wl[0].buf[c.wl[0].pos:]); e {
+		case syscall.EAGAIN:
+			//c.Println("write", n, "bytes", uintptr(syscall.EAGAIN), e)
+			// 当双方buffer全满时，e=11，n=-1
+			// 预防万一
+			if n < 0 {
 				c.wl[0].pos += n
-				return e
-			case nil:
-				// 测试一下，发送成功的情况下，是否有未完整发送的情况。理论上无
-				// 改成list
-				if n == len(c.wl[0].buf[c.wl[0].pos:]) {
-					c.wl = c.wl[1:]
-				} else {
-					c.wl[0].pos += n
-				}
 			}
+			return e
+		case nil:
+			//c.Println("pos", c.wl[0].pos, "len", len(c.wl[0].buf), "write", n)
+			// 当对方buffer满，本方本次会写入部分数据，同时e=nil
+			if n == len(c.wl[0].buf[c.wl[0].pos:]) {
+				c.wl = c.wl[1:]
+			} else {
+				c.wl[0].pos += n
+			}
+		default:
+			return e
 		}
 	}
 	return nil

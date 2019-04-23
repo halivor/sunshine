@@ -52,7 +52,6 @@ func (p *Peer) CallBack(ev uint32) {
 	for {
 		switch {
 		case ev&syscall.EPOLLIN != 0:
-			p.Println("ev in ------")
 			n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
 			switch e {
 			case nil:
@@ -73,18 +72,20 @@ func (p *Peer) CallBack(ev uint32) {
 				return
 			}
 		case ev&syscall.EPOLLERR != 0:
-			p.Println("ev err ------")
 			p.Release()
+			return
 		case ev&syscall.EPOLLOUT != 0:
-			p.Println("ev out ------")
-			if e := p.SendAgain(); e == nil {
+			switch e := p.SendAgain(); e {
+			case nil:
 				p.ev = syscall.EPOLLIN
 				p.ModEvent(p)
-			} else if e == os.ErrClosed {
+			case os.ErrClosed:
 				p.Release()
 			}
+			return
 		default:
-			p.Println("ev %d ------", ev)
+			p.Release()
+			return
 		}
 	}
 }
@@ -99,7 +100,6 @@ func (p *Peer) Process() (e error) {
 		}
 	case PS_NORMAL:
 		for {
-			//p.Println("normal", p.pos, string(p.rb[pkt.HLen:p.pos]))
 			packet, e := p.Parse()
 			if e != nil {
 				return e
@@ -108,7 +108,6 @@ func (p *Peer) Process() (e error) {
 		}
 	}
 
-	//p.Println("done", p.pos)
 	return nil
 }
 
@@ -186,7 +185,6 @@ func (p *Peer) Parse() (packet []byte, e error) {
 	p.rb = nb
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
 	p.pos = pkt.HLen + rl
-	//p.Println("parse end", p.pos)
 	return packet, nil
 }
 
@@ -195,6 +193,10 @@ func (p *Peer) Send(data []byte) {
 	case syscall.EAGAIN:
 		p.ev |= syscall.EPOLLOUT
 		p.ModEvent(p)
+	case nil:
+		return
+	default:
+		p.Release()
 	}
 }
 
