@@ -23,6 +23,7 @@ type uinfo struct {
 type Peer struct {
 	rb  []byte
 	pos int
+	pkt []byte
 	ev  uint32
 	ps  peerStat
 
@@ -100,11 +101,11 @@ func (p *Peer) Process() (e error) {
 		}
 	case PS_NORMAL:
 		for {
-			packet, e := p.Parse()
-			if e != nil {
+
+			if e := p.Parse(); e != nil {
 				return e
 			}
-			p.Transfer(packet)
+			p.Transfer(p.pkt)
 		}
 	}
 
@@ -121,38 +122,33 @@ func (p *Peer) Auth() (e error) {
 		p.Add(p)
 	}()
 	a := (*pkt.Auth)(unsafe.Pointer(&p.rb[pkt.HLen]))
-	if p.pos < pkt.HLen+pkt.ALen || p.pos < pkt.HLen+pkt.ALen+a.Len() {
-		p.Println("not enough")
+	plen := pkt.HLen + pkt.ALen + a.Len()
+	if p.pos < pkt.HLen+pkt.ALen || p.pos < plen {
 		return syscall.EAGAIN
 	}
 
-	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
-	h.Ver = uint16(a.Ver())
-	h.Nid = cnf.NodeId
-	h.Uid = uint32(a.Uid())
-	h.Cid = uint32(a.Cid())
+	p.Ver = uint16(a.Ver())
+	p.Nid = cnf.NodeId
+	p.Uid = uint32(a.Uid())
+	p.Cid = uint32(a.Cid())
 	p.ps = PS_NORMAL
-	p.Header = *(*pkt.Header)(unsafe.Pointer(&p.rb[0]))
 	// verify failed os.ErrInvalid
 
 	// 转发packet消息
-	packet := p.rb[:pkt.HLen+pkt.ALen+a.Len()]
-	if p.pos > pkt.HLen+pkt.ALen+a.Len() {
-		nb := bp.Alloc()
-		copy(nb[pkt.HLen:], p.rb[len(packet):p.pos])
-		p.rb = nb
-		p.pos = pkt.HLen + p.pos - len(packet)
-	} else {
-		p.rb = bp.Alloc()
-		p.pos = pkt.HLen
+	p.pkt = p.rb[:plen]
+	p.rb = bp.Alloc()
+	p.pos = pkt.HLen
+	if p.pos > plen {
+		copy(p.rb[pkt.HLen:], p.rb[plen:p.pos])
+		p.pos = pkt.HLen + p.pos - plen
 	}
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
-	p.Transfer(packet)
+	p.Transfer(p.pkt)
 
 	return nil
 }
 
-func (p *Peer) Parse() (packet []byte, e error) {
+func (p *Peer) Parse() (e error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("parse =>", r)
@@ -160,32 +156,28 @@ func (p *Peer) Parse() (packet []byte, e error) {
 		}
 	}()
 	sh := (*pkt.SHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
-	if p.pos < pkt.HLen+pkt.SHLen || p.pos < pkt.HLen+pkt.SHLen+sh.Len() {
-		return nil, syscall.EAGAIN
-	}
-
-	h := (*pkt.Header)(unsafe.Pointer(&p.rb[0]))
-	if sh.Len() > 4*1024 {
-		return nil, os.ErrInvalid
-	}
-	h.Cmd = uint32(sh.Cmd())
-	h.Len = uint32(pkt.SHLen + sh.Len())
 	plen := pkt.HLen + pkt.SHLen + sh.Len()
-	if plen > p.pos {
-		return nil, nil
-	}
-	packet = p.rb[:plen]
-	nb := bp.Alloc()
-
-	rl := p.pos - plen
-	if rl > 0 {
-		copy(nb[pkt.HLen:], p.rb[plen:p.pos])
+	if p.pos < pkt.HLen+pkt.SHLen || p.pos < plen {
+		return syscall.EAGAIN
 	}
 
-	p.rb = nb
+	if sh.Len() > 4*1024 {
+		return os.ErrInvalid
+	}
+	p.Cmd = uint32(sh.Cmd())
+	p.Len = uint32(pkt.SHLen + sh.Len())
+
+	p.pkt = p.rb
+	p.rb = bp.Alloc()
+	p.pos = pkt.HLen
+	if rl := p.pos - plen; rl > 0 {
+		copy(p.rb[pkt.HLen:], p.pkt[plen:p.pos])
+		p.pos += rl
+	}
+
+	p.pkt = p.pkt[:plen]
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
-	p.pos = pkt.HLen + rl
-	return packet, nil
+	return nil
 }
 
 func (p *Peer) Send(data []byte) {

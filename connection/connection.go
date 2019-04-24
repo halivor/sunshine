@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	MAX_SENDQ_SIZE = 32 // 超过队列，写入报错
+	MAX_SENDQ_SIZE      = 32 // 超过队列，写入报错
+	DEFAULT_BUFFER_SIZE = 32 * 1024
 )
 
 type Conn interface {
@@ -36,8 +37,8 @@ type C struct {
 }
 
 func NewConn(fd int) *C {
-	SetSndBuf(fd, 6*1024)
-	SetRcvBuf(fd, 64*1024)
+	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
+	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
 	return &C{
 		fd:     fd,
 		ss:     ESTAB,
@@ -51,8 +52,8 @@ func NewTcpConn() (*C, error) {
 	if e != nil {
 		return nil, e
 	}
-	SetSndBuf(fd, 64*1024)
-	SetRcvBuf(fd, 64*1024)
+	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
+	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
 	return &C{
 		fd:     fd,
 		ss:     CREATE,

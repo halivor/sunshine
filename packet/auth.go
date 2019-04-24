@@ -10,7 +10,7 @@ type Auth struct {
 	ver  [4]byte
 	uid  [8]byte
 	cid  [8]byte
-	sign [32]byte
+	sign [8]byte
 	len  [4]byte
 }
 
