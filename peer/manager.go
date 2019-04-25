@@ -79,7 +79,7 @@ func (pm *manager) Consume(message interface{}) interface{} {
 			//pm.Println("consume bullet", string(data[pkt.HLen:]))
 			pm.broadcast(data)
 		case pkt.C_CHAT:
-			pm.Println("consume chat", string(data[pkt.HLen:]))
+			//pm.Println("consume chat", string(data[pkt.HLen:]))
 			pm.unicast(h.Uid, data)
 		default:
 			pm.Println("consume default", string(data[pkt.HLen:]))
@@ -92,7 +92,7 @@ func (pm *manager) Consume(message interface{}) interface{} {
 
 func (pm *manager) Transfer(message []byte) {
 	if message != nil {
-		pm.Println("produce", string(message))
+		//pm.Println("produce", string(message))
 		pm.Produce(mw.T_TRANSFER, pm.uqid, message)
 	}
 }

@@ -7,9 +7,12 @@ import (
 
 type SHeader struct {
 	ver [4]byte
+	typ uint16
+	opt uint16
 	cmd [4]byte
 	seq [8]byte
 	len [4]byte
+	res [8]byte
 }
 
 func (h *SHeader) Ver() int {

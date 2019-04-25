@@ -15,11 +15,12 @@ var wg sync.WaitGroup
 
 func main() {
 	wg.Add(1)
-	go newFrontend()
+	go newFrontend("0.0.0.0:10301")
+	//go newFrontend("0.0.0.0:10302")
 	wg.Wait()
 }
 
-func newFrontend() {
+func newFrontend(addr string) {
 	defer func() {
 		/*if r := recover(); r != nil {*/
 		//log.Println("panic =>", r)
@@ -31,10 +32,10 @@ func newFrontend() {
 		log.Println("new event pool failed:", e)
 	}
 	mws := mw.New()
-	if _, e := ac.NewTcpAcceptor("0.0.0.0:19981", ep, mws); e != nil {
+	if _, e := ac.NewTcpAcceptor(addr, ep, mws); e != nil {
 		log.Println("new acceptor failed:", e)
 	}
-	if _, e := ag.New("127.0.0.1:29981", ep, mws); e != nil {
+	if _, e := ag.New("127.0.0.1:10205", ep, mws); e != nil {
 		log.Println("new agent failed:", e)
 	}
 	ep.Run()

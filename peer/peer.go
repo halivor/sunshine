@@ -50,39 +50,31 @@ func New(conn c.Conn, ep evp.EventPool, pm Manager) (p *Peer) {
 }
 
 func (p *Peer) CallBack(ev uint32) {
+	switch {
+	case ev&syscall.EPOLLIN != 0:
+		p.recv()
+	case ev&syscall.EPOLLOUT != 0:
+		p.send()
+	default:
+		p.Println("event error", ev)
+		p.Release()
+	}
+}
+
+func (p *Peer) recv() {
 	for {
-		switch {
-		case ev&syscall.EPOLLIN != 0:
-			n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
-			switch e {
-			case nil:
-				if n == 0 {
-					p.Release()
-					return
-				}
-				p.pos += n
-				switch e := p.Process(); e {
-				case nil, syscall.EAGAIN:
-				default:
-					p.Release()
-				}
-			case syscall.EAGAIN:
-				return
-			default:
+		n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
+		switch e {
+		case nil:
+			if n == 0 {
 				p.Release()
 				return
 			}
-		case ev&syscall.EPOLLERR != 0:
-			p.Release()
-			return
-		case ev&syscall.EPOLLOUT != 0:
-			switch e := p.SendAgain(); e {
-			case nil:
-				p.ev = syscall.EPOLLIN
-				p.ModEvent(p)
-			case os.ErrClosed:
+			p.pos += n
+			if e := p.process(); e != nil && e != syscall.EAGAIN {
 				p.Release()
 			}
+		case syscall.EAGAIN:
 			return
 		default:
 			p.Release()
@@ -91,18 +83,29 @@ func (p *Peer) CallBack(ev uint32) {
 	}
 }
 
-func (p *Peer) Process() (e error) {
+func (p *Peer) send() {
+	switch e := p.SendAgain(); e {
+	case nil:
+		p.ev = syscall.EPOLLIN
+		p.ModEvent(p)
+	case syscall.EAGAIN:
+	default: // os.ErrClosed...
+		p.Release()
+	}
+}
+
+func (p *Peer) process() (e error) {
 	switch p.ps {
 	case PS_ESTAB:
 		p.Println("estab", p.pos, string(p.rb[pkt.HLen:p.pos]))
 		// 头长度不够，继续读取
-		if e = p.Auth(); e != nil {
+		if e = p.auth(); e != nil {
 			return e
 		}
 	case PS_NORMAL:
 		for {
 
-			if e := p.Parse(); e != nil {
+			if e := p.parse(); e != nil {
 				return e
 			}
 			p.Transfer(p.pkt)
@@ -112,7 +115,7 @@ func (p *Peer) Process() (e error) {
 	return nil
 }
 
-func (p *Peer) Auth() (e error) {
+func (p *Peer) auth() (e error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("check =>", r)
@@ -148,7 +151,7 @@ func (p *Peer) Auth() (e error) {
 	return nil
 }
 
-func (p *Peer) Parse() (e error) {
+func (p *Peer) parse() (e error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("parse =>", r)

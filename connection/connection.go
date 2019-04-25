@@ -75,9 +75,8 @@ func (c *C) Send(message []byte) error {
 		return nil
 	}
 	n, e := syscall.Write(c.fd, message)
-	//c.Println("write", n, "bytes", e)
+	//c.Println("write", n, ", error", e)
 	if e == syscall.EAGAIN {
-		//bp.Release(message)
 		if n < 0 {
 			n = 0
 		}
@@ -85,6 +84,14 @@ func (c *C) Send(message []byte) error {
 			buf: message,
 			pos: n,
 		})
+	}
+	if e == nil {
+		if n != len(message) {
+			c.wl = append(c.wl, &packet{
+				buf: message,
+				pos: n,
+			})
+		}
 	}
 	return e
 }

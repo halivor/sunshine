@@ -105,7 +105,7 @@ func (a *Agent) Process() {
 		//a.Println("bullet", a.pos, string(a.buf[pkt.HLen:a.pos]))
 		a.Produce(m.T_TRANSFER, a.cqid, a.buf[:a.pos])
 	case pkt.C_CHAT:
-		a.Println("chat", a.pos, string(a.buf[pkt.HLen:a.pos]))
+		//a.Println("chat", a.pos, string(a.buf[pkt.HLen:a.pos]))
 		a.Produce(m.T_TRANSFER, a.bqid, a.buf[:a.pos])
 	default:
 		a.Println("default", a.pos, string(a.buf[pkt.HLen:a.pos]))
