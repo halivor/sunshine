@@ -25,6 +25,7 @@ type Header struct {
 
 type UHeader interface {
 	Ver() int
+	Opt() int
 	Cmd() int
 	Seq() int
 	Len() int
@@ -35,3 +36,14 @@ const (
 	ALen  = int(unsafe.Sizeof(Auth{}))
 	SHLen = int(unsafe.Sizeof(SHeader{}))
 )
+
+func Parse(pb []byte) UHeader {
+	switch pb[2] {
+	case 'B':
+		return (*BHeader)(unsafe.Pointer(&pb[0]))
+	case 'S':
+		return (*SHeader)(unsafe.Pointer(&pb[0]))
+	}
+	panic("undefined head type")
+	return nil
+}

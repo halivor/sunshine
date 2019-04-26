@@ -6,9 +6,9 @@ import (
 )
 
 type SHeader struct {
-	ver [4]byte
-	typ uint16
-	opt uint16
+	ver [2]byte
+	typ uint8
+	opt uint8
 	cmd [4]byte
 	seq [8]byte
 	len [4]byte
@@ -21,6 +21,10 @@ func (h *SHeader) Ver() int {
 		log.Panicln(e)
 	}
 	return v
+}
+
+func (h *SHeader) Opt() int {
+	return int(h.opt)
 }
 
 func (h *SHeader) Cmd() int {

@@ -17,8 +17,9 @@ type Manager interface {
 }
 
 type manager struct {
-	peers map[uint32]*Peer
-	rooms map[uint32]map[*Peer]struct{}
+	peers map[*Peer]struct{}            // 仅在全体消息广播时使用
+	users map[uint32]map[*Peer]struct{} // 仅在指定用户ID发送时使用
+	rooms map[uint32]map[*Peer]struct{} // 仅在指定房间发送时使用
 	uqid  mw.QId
 
 	mw.Middleware
@@ -33,57 +34,74 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 		pm.Bind(mw.T_TRANSFER, "dbullet", mw.A_CONSUME, pm)
 	}()
 	return &manager{
-		peers:      make(map[uint32]*Peer),
-		rooms:      make(map[uint32]map[*Peer]struct{}),
+		peers:      make(map[*Peer]struct{}, 1024),
+		users:      make(map[uint32]map[*Peer]struct{}, 1024),
+		rooms:      make(map[uint32]map[*Peer]struct{}, 1024),
 		Middleware: mdw,
 		Logger:     cnf.NewLogger("[pm] "),
 	}
 }
 
+// uid = 0 匿名用户
+// rid = 0 非房间用户
 func (pm *manager) Add(p *Peer) {
 	// 超时重连
+	pm.peers[p] = struct{}{}
 	pm.Println("add", p.Uid)
-	if pp, ok := pm.peers[p.Uid]; ok {
-		pp.Release()
+	if _, ok := pm.users[p.Uid]; !ok {
+		pm.users[p.Uid] = make(map[*Peer]struct{}, 16)
 	}
-	pm.peers[p.Uid] = p
+	pm.users[p.Uid][p] = struct{}{}
 
 	if _, ok := pm.rooms[p.Cid]; !ok {
-		pm.rooms[p.Cid] = make(map[*Peer]struct{}, 1024)
+		pm.rooms[p.Cid] = make(map[*Peer]struct{}, 128)
 	}
 	pm.rooms[p.Cid][p] = struct{}{}
 }
 
 func (pm *manager) Del(p *Peer) {
-	delete(pm.peers, p.Uid)
-}
-
-func (pm *manager) unicast(uid uint32, message []byte) {
-	if u, ok := pm.peers[uid]; ok {
-		u.Send(message[pkt.HLen:])
+	delete(pm.peers, p)
+	if ps, ok := pm.users[p.Uid]; ok {
+		delete(ps, p)
+	}
+	if cp, ok := pm.users[p.Cid]; ok {
+		delete(cp, p)
 	}
 }
 
-func (pm *manager) broadcast(message []byte) {
-	for _, p := range pm.peers {
-		p.Send(message[pkt.HLen:])
+func (pm *manager) unicast(uid uint32, message []byte) {
+	if us, ok := pm.users[uid]; ok {
+		for usr, _ := range us {
+			usr.Send(message[pkt.HLen:])
+		}
+	}
+}
+
+func (pm *manager) broadcast(cid uint32, message []byte) {
+	switch {
+	case cid > 0:
+		if r, ok := pm.rooms[cid]; ok {
+			for p, _ := range r {
+				p.Send(message[pkt.HLen:])
+			}
+		}
+	default:
+		for p, _ := range pm.peers {
+			p.Send(message[pkt.HLen:])
+		}
 	}
 }
 
 func (pm *manager) Consume(message interface{}) interface{} {
 	if data, ok := message.([]byte); ok {
-		u := (*pkt.SHeader)(unsafe.Pointer(&data[pkt.HLen]))
 		h := (*pkt.Header)(unsafe.Pointer(&data[0]))
-		switch u.Cmd() {
-		case pkt.C_BULLET:
-			//pm.Println("consume bullet", string(data[pkt.HLen:]))
-			pm.broadcast(data)
-		case pkt.C_CHAT:
-			//pm.Println("consume chat", string(data[pkt.HLen:]))
+		switch {
+		case h.Uid > 0:
+			pm.Println("unicast", h.Uid)
 			pm.unicast(h.Uid, data)
 		default:
-			pm.Println("consume default", string(data[pkt.HLen:]))
-			pm.Println(string(data[pkt.HLen:]))
+			pm.Println("broadcast", h.Uid, h.Cid)
+			pm.broadcast(h.Cid, data)
 		}
 
 	}

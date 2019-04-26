@@ -7,7 +7,9 @@ import (
 )
 
 type Auth struct {
-	ver  [4]byte
+	ver  [2]byte
+	typ  uint8
+	opt  uint8
 	uid  [8]byte
 	cid  [8]byte
 	sign [8]byte
