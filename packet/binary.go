@@ -7,7 +7,7 @@ type BHeader struct {
 	cmd uint32
 	seq uint64
 	len uint32
-	res [8]byte
+	res uint64
 }
 
 func (h *BHeader) Ver() int {
@@ -22,8 +22,8 @@ func (h *BHeader) Cmd() int {
 	return int(h.cmd)
 }
 
-func (h *BHeader) Seq() int {
-	return int(h.seq)
+func (h *BHeader) Seq() uint64 {
+	return h.seq
 }
 
 func (h *BHeader) Len() int {

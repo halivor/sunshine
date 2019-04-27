@@ -19,15 +19,22 @@ type Header struct {
 	Uid uint32 // user id
 	Cid uint32 // user type
 	Cmd uint32
-	Len uint32
+	len uint32
 	Res [12]byte
+}
+
+func (h *Header) Len() int {
+	return int(h.len)
+}
+func (h *Header) SetLen(len uint32) {
+	h.len = len
 }
 
 type UHeader interface {
 	Ver() int
 	Opt() int
 	Cmd() int
-	Seq() int
+	Seq() uint64
 	Len() int
 }
 

@@ -110,6 +110,8 @@ func (p *Peer) process() (e error) {
 			}
 			p.Transfer(p.pkt)
 		}
+	default:
+		return os.ErrInvalid
 	}
 
 	return nil
@@ -158,7 +160,8 @@ func (p *Peer) parse() (e error) {
 			e = os.ErrInvalid
 		}
 	}()
-	sh := (*pkt.SHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
+	sh := pkt.Parse(p.rb[pkt.HLen:])
+	//sh := (*pkt.SHeader)(unsafe.Pointer(&p.rb[pkt.HLen]))
 	plen := pkt.HLen + pkt.SHLen + sh.Len()
 	if p.pos < pkt.HLen+pkt.SHLen || p.pos < plen {
 		return syscall.EAGAIN
@@ -168,7 +171,7 @@ func (p *Peer) parse() (e error) {
 		return os.ErrInvalid
 	}
 	p.Cmd = uint32(sh.Cmd())
-	p.Len = uint32(pkt.SHLen + sh.Len())
+	p.SetLen(uint32(pkt.SHLen + sh.Len()))
 
 	p.pkt = p.rb
 	p.rb = bp.Alloc()

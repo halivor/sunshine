@@ -35,8 +35,8 @@ func (h *SHeader) Cmd() int {
 	return c
 }
 
-func (h *SHeader) Seq() int {
-	s, e := strconv.Atoi(string(h.seq[:]))
+func (h *SHeader) Seq() uint64 {
+	s, e := strconv.ParseUint(string(h.seq[:]), 10, 64)
 	if e != nil {
 		log.Panicln(e)
 	}

@@ -76,11 +76,23 @@ func (a *Agent) CallBack(ev uint32) {
 	switch {
 	case ev&syscall.EPOLLIN != 0:
 		n, e := syscall.Read(a.Fd(), a.buf[a.pos:])
-		if e != nil {
+		if e != nil || n == 0 {
 			a.Release()
 			return
 		}
 		a.pos += n
+		h := (*pkt.Header)(unsafe.Pointer(&a.buf[0]))
+		a.Println("recv", string(a.buf[:a.pos]))
+		if a.pos < pkt.HLen || a.pos < pkt.HLen+h.Len() {
+			// 消息超大，增大buffer
+			if a.pos == cap(a.buf) {
+				buf := bp.AllocLarge(cap(a.buf) * 2)
+				copy(buf, a.buf)
+				a.buf = buf
+			}
+			// 消息接收不完整，继续接收
+			return
+		}
 		a.Process()
 	case ev&syscall.EPOLLOUT != 0:
 	case ev&syscall.EPOLLERR != 0:
@@ -89,29 +101,32 @@ func (a *Agent) CallBack(ev uint32) {
 }
 
 func (a *Agent) Process() {
-	h := (*pkt.Header)(unsafe.Pointer(&a.buf[0]))
-	u := (*pkt.SHeader)(unsafe.Pointer(&a.buf[pkt.HLen]))
-	//a.Println("process", a.buf[:a.pos])
-	if a.pos < pkt.HLen+pkt.SHLen || a.pos < pkt.HLen+pkt.SHLen+u.Len() {
-		if a.pos == cap(a.buf) {
-			buf := bp.AllocLarge(cap(a.buf) * 2)
-			copy(buf, a.buf)
-			a.buf = buf
+	buf := a.buf
+	beg := 0
+	end := a.pos
+	h := (*pkt.Header)(unsafe.Pointer(&buf[0]))
+	for {
+		switch h.Cmd {
+		case pkt.C_BULLET:
+			//a.Println("bullet", string(a.buf[beg+pkt.HLen:beg+pkt.HLen+h.Len()]))
+			a.Produce(m.T_TRANSFER, a.cqid, buf[beg:beg+pkt.HLen+h.Len()])
+		case pkt.C_CHAT:
+			//a.Println("chat", string(a.buf[beg+pkt.HLen:beg+pkt.HLen+h.Len()]))
+			a.Produce(m.T_TRANSFER, a.bqid, buf[beg:beg+pkt.HLen+h.Len()])
+		default:
+			a.Println("default", string(buf[beg+pkt.HLen:beg+pkt.HLen+h.Len()]))
 		}
-		return
+		beg += pkt.HLen + h.Len()
+		h = (*pkt.Header)(unsafe.Pointer(&buf[beg]))
+		if end-beg <= pkt.HLen || end-beg < pkt.HLen+h.Len() {
+			break
+		}
 	}
-	switch h.Cmd {
-	case pkt.C_BULLET:
-		//a.Println("bullet", a.pos, string(a.buf[pkt.HLen:a.pos]))
-		a.Produce(m.T_TRANSFER, a.cqid, a.buf[:a.pos])
-	case pkt.C_CHAT:
-		//a.Println("chat", a.pos, string(a.buf[pkt.HLen:a.pos]))
-		a.Produce(m.T_TRANSFER, a.bqid, a.buf[:a.pos])
-	default:
-		a.Println("default", a.pos, string(a.buf[pkt.HLen:a.pos]))
-	}
-	a.buf = bp.Alloc()
 	a.pos = 0
+	if beg != end {
+		copy(a.buf, buf[beg:end])
+		a.pos = end - beg
+	}
 }
 
 func (a *Agent) Consume(message interface{}) interface{} {
@@ -131,5 +146,6 @@ func (a *Agent) Event() uint32 {
 }
 
 func (a *Agent) Release() {
+	a.DelEvent(a)
 	a.C.Close()
 }

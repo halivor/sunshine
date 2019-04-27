@@ -15,8 +15,8 @@ var wg sync.WaitGroup
 
 func main() {
 	wg.Add(1)
-	//go newFrontend("0.0.0.0:10301")
-	//go newFrontend("0.0.0.0:10302")
+	go newFrontend("0.0.0.0:10301")
+	go newFrontend("0.0.0.0:10302")
 	go newFrontend("0.0.0.0:10303")
 	wg.Wait()
 }
