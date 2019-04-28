@@ -87,11 +87,12 @@ func (p *Peer) auth() (e error) {
 	// 转发packet消息
 	p.pkt = p.rb[:plen]
 	p.rb = bp.Alloc()
-	p.pos = pkt.HLen
 	if p.pos > plen {
-		copy(p.rb[pkt.HLen:], p.rb[plen:p.pos])
-		p.pos = pkt.HLen + p.pos - plen
+		copy(p.rb[pkt.HLen:], p.pkt[plen:p.pos])
 	}
+	p.pos = pkt.HLen + p.pos - plen
+	p.Println("auth remain", p.pos, string(p.rb[pkt.HLen:p.pos]))
+
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
 	p.Transfer(p.pkt)
 	p.Send([]byte(pkt.AUTH_SUCC))
@@ -119,12 +120,12 @@ func (p *Peer) parse() (e error) {
 	p.Header.SetLen(uint32(pkt.SHLen + sh.Len()))
 
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
+
 	p.pkt = p.rb[:plen]
 	p.rb = bp.Alloc()
-	p.pos = pkt.HLen
-	if rl := p.pos - plen; rl > 0 {
+	if p.pos > plen {
 		copy(p.rb[pkt.HLen:], p.pkt[plen:p.pos])
-		p.pos += rl
 	}
+	p.pos = pkt.HLen + p.pos - plen
 	return nil
 }

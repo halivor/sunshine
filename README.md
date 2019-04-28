@@ -10,9 +10,10 @@ Header  // 内部通讯格式，与外部无关
 SHeader // 与客户端交互格式，字符串头
 > ver   "10"
 > typ   'B' 二进制头
->       'S' 字符串头
+>      'S' 字符串头
 > opt   '0' 普通消息
->       '1' 消息需要ack
+>      '1' 消息需要ack
+>      'A' ack消息
 > cmd       命令号 100, typ = 'S', cmd = '0100' 
 >                       typ = 'B', cmd =   100 , 使用大端表示
 > seq       待确认消息sequence
