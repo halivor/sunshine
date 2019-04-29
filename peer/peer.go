@@ -9,47 +9,47 @@ import (
 	cnf "github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
 	pkt "github.com/halivor/frontend/packet"
-	evp "github.com/halivor/goevent/eventpool"
+	ep "github.com/halivor/goevent/eventpool"
 )
 
 type Peer struct {
 	rb  []byte
 	pos int
 	pkt []byte
-	ev  uint32
+	ev  ep.EP_EVENT
 	ps  peerStat
 
 	pkt.Header
 	Manager
 	c.Conn
-	evp.EventPool
+	ep.EventPool
 	*log.Logger
 }
 
-func New(conn c.Conn, ep evp.EventPool, pm Manager) (p *Peer) {
+func New(conn c.Conn, epr ep.EventPool, pm Manager) (p *Peer) {
 	p = &Peer{
-		ev:  syscall.EPOLLIN,
+		ev:  ep.EV_READ,
 		rb:  bp.Alloc(),
 		pos: pkt.HLen,
 		ps:  PS_ESTAB,
 
 		Manager:   pm,
 		Conn:      conn,
-		EventPool: ep,
+		EventPool: epr,
 		Logger:    cnf.NewLogger(fmt.Sprintf("[peer(%d)]", conn.Fd())),
 	}
 	return
 }
 
-func (p *Peer) CallBack(ev uint32) {
+func (p *Peer) CallBack(ev ep.EP_EVENT) {
 	switch {
-	case ev&syscall.EPOLLIN != 0:
+	case ev&ep.EV_READ != 0:
 		switch e := p.recv(); e {
 		case nil, syscall.EAGAIN:
 		default:
 			p.Release()
 		}
-	case ev&syscall.EPOLLOUT != 0:
+	case ev&ep.EV_WRITE != 0:
 		p.sendAgain()
 	default:
 		p.Println("event error", ev)
@@ -60,7 +60,7 @@ func (p *Peer) CallBack(ev uint32) {
 func (p *Peer) sendAgain() {
 	switch e := p.SendAgain(); e {
 	case nil:
-		p.ev = syscall.EPOLLIN
+		p.ev = ep.EV_READ
 		p.ModEvent(p)
 	case syscall.EAGAIN:
 	default: // os.ErrClosed...
@@ -71,7 +71,7 @@ func (p *Peer) sendAgain() {
 func (p *Peer) Send(data []byte) {
 	switch e := p.Conn.Send(data); e {
 	case syscall.EAGAIN:
-		p.ev |= syscall.EPOLLOUT
+		p.ev |= ep.EV_WRITE
 		p.ModEvent(p)
 	case nil:
 		return
@@ -80,7 +80,7 @@ func (p *Peer) Send(data []byte) {
 	}
 }
 
-func (p *Peer) Event() uint32 {
+func (p *Peer) Event() ep.EP_EVENT {
 	return p.ev
 }
 

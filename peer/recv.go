@@ -116,7 +116,7 @@ func (p *Peer) parse() (e error) {
 	if sh.Len() > 4*1024 {
 		return os.ErrInvalid
 	}
-	p.Header.Cmd = uint32(sh.Cmd())
+	p.Header.Cmd = pkt.CmdID(sh.Cmd())
 	p.Header.SetLen(uint32(pkt.SHLen + sh.Len()))
 
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header

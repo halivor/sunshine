@@ -1,14 +1,20 @@
 package packet
 
+import (
+	"strconv"
+)
+
+type CmdID uint32
+
 //系统消息
 const (
-	C_PING = 100 + iota
+	C_PING CmdID = 100 + iota
 	C_PONG
 )
 
 // 应用消息
 const (
-	C_BULLET = 2000 + iota
+	C_BULLET CmdID = 2000 + iota
 	C_CHAT
 )
 
@@ -17,3 +23,7 @@ const (
 	PING      = "10S10100123456780004RESERVEDPING"
 	PONG      = "10S10100123456780004RESERVEDPONG"
 )
+
+func (id CmdID) ToString() string {
+	return strconv.Itoa(int(id))
+}

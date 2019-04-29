@@ -30,8 +30,6 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 	defer func() {
 		pm.uqid = pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
 		pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
-		pm.Bind(mw.T_TRANSFER, "dchat", mw.A_CONSUME, pm)
-		pm.Bind(mw.T_TRANSFER, "dbullet", mw.A_CONSUME, pm)
 	}()
 	return &manager{
 		peers:      make(map[*Peer]struct{}, 1024),

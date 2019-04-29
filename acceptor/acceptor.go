@@ -8,22 +8,22 @@ import (
 	"github.com/halivor/frontend/config"
 	c "github.com/halivor/frontend/connection"
 	p "github.com/halivor/frontend/peer"
-	e "github.com/halivor/goevent/eventpool"
+	ep "github.com/halivor/goevent/eventpool"
 	m "github.com/halivor/goevent/middleware"
 )
 
 type Acceptor struct {
-	ev   uint32
+	ev   ep.EP_EVENT
 	addr string
 
 	*c.C
-	e.EventPool // event: add, del, mod
+	ep.EventPool // event: add, del, mod
 	p.Manager
 
 	*log.Logger
 }
 
-func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, e error) {
+func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor, e error) {
 	defer func() {
 		a.AddEvent(a)
 	}()
@@ -45,10 +45,10 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, 
 	}
 
 	a = &Acceptor{
-		ev:        syscall.EPOLLIN,
+		ev:        ep.EV_READ,
 		addr:      addr,
 		C:         C,
-		EventPool: ep,
+		EventPool: epr,
 		Manager:   p.NewManager(mw),
 		Logger:    config.NewLogger(fmt.Sprintf("[accept(%d)] ", C.Fd())),
 	}
@@ -57,8 +57,8 @@ func NewTcpAcceptor(addr string, ep e.EventPool, mw m.Middleware) (a *Acceptor, 
 }
 
 // TODO: 细化异常处理流程
-func (a *Acceptor) CallBack(ev uint32) {
-	if ev&syscall.EPOLLERR != 0 {
+func (a *Acceptor) CallBack(ev ep.EP_EVENT) {
+	if ev&ep.EV_ERROR != 0 {
 		a.Println("epoll error", ev)
 		a.DelEvent(a)
 		return
@@ -73,7 +73,7 @@ func (a *Acceptor) CallBack(ev uint32) {
 		// TODO: 释放并重启acceptor
 	}
 }
-func (a *Acceptor) Event() uint32 {
+func (a *Acceptor) Event() ep.EP_EVENT {
 	return a.ev
 }
 func (a *Acceptor) Release() {

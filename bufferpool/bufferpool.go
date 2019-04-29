@@ -3,7 +3,7 @@ package bufferpool
 import (
 	"container/list"
 
-	"github.com/halivor/frontend/config"
+	cnf "github.com/halivor/frontend/config"
 )
 
 type BufferPool struct {
@@ -39,31 +39,31 @@ func Release(buffer []byte) {
 // length <= 4K
 // length >= 4M
 func (bp *BufferPool) Alloc() []byte {
-	return make([]byte, config.BUF_MIN_LEN)
+	return make([]byte, cnf.BUF_MIN_LEN)
 	if bp.idle.Len() > 0 {
 		if buffer, ok := bp.idle.Remove(bp.idle.Front()).([]byte); ok {
 			return buffer
 		}
 	}
-	return make([]byte, config.BUF_MIN_LEN)
+	return make([]byte, cnf.BUF_MIN_LEN)
 }
 
 func (bp *BufferPool) AllocLarge(length int) []byte {
-	if length <= config.BUF_MIN_LEN {
+	if length <= cnf.BUF_MIN_LEN {
 		return bp.Alloc()
 	}
 	if length >= 4*1024*1024 {
-		return make([]byte, length+(^length&(config.BUF_MIN_LEN-1)+1)&(config.BUF_MIN_LEN-1))
+		return make([]byte, length+(^length&(cnf.BUF_MIN_LEN-1)+1)&(cnf.BUF_MIN_LEN-1))
 	}
-	if _, ok := bp.large[length+(^length&(config.BUF_MIN_LEN-1)+1)&(config.BUF_MIN_LEN-1)]; ok {
+	if _, ok := bp.large[length+(^length&(cnf.BUF_MIN_LEN-1)+1)&(cnf.BUF_MIN_LEN-1)]; ok {
 	}
-	return make([]byte, length+(^length&(config.BUF_MIN_LEN-1)+1)&(config.BUF_MIN_LEN-1))
+	return make([]byte, length+(^length&(cnf.BUF_MIN_LEN-1)+1)&(cnf.BUF_MIN_LEN-1))
 }
 
 func (bp *BufferPool) Release(buffer []byte) {
 	switch {
-	case cap(buffer) == config.BUF_MIN_LEN:
-	case cap(buffer) >= config.BUF_MAX_LEN:
+	case cap(buffer) == cnf.BUF_MIN_LEN:
+	case cap(buffer) >= cnf.BUF_MAX_LEN:
 	default:
 	}
 }

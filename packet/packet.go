@@ -18,7 +18,7 @@ type Header struct {
 	Nid uint16 // node id
 	Uid uint32 // user id
 	Cid uint32 // user type
-	Cmd uint32
+	Cmd CmdID
 	len uint32
 	Res [12]byte
 }
