@@ -76,7 +76,7 @@ func (a *Agent) CallBack(ev ep.EP_EVENT) {
 		}
 		a.pos += n
 		h := (*p.Header)(unsafe.Pointer(&a.buf[0]))
-		a.Println("recv", string(a.buf[:a.pos]))
+		//a.Println("recv", string(a.buf[:a.pos]))
 		if a.pos < p.HLen || a.pos < p.HLen+h.Len() {
 			// 消息超大，增大buffer
 			if a.pos == cap(a.buf) {

@@ -98,7 +98,7 @@ func (pm *manager) Consume(message interface{}) interface{} {
 			pm.Println("unicast", h.Uid)
 			pm.unicast(h.Uid, data)
 		default:
-			pm.Println("broadcast", h.Uid, h.Cid)
+			//pm.Println("broadcast", h.Uid, h.Cid)
 			pm.broadcast(h.Cid, data)
 		}
 

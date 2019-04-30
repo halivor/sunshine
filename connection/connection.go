@@ -86,11 +86,12 @@ func (c *C) Send(message []byte) error {
 		})
 	}
 	if e == nil {
-		if n != len(message) {
+		if n < len(message) {
 			c.wl = append(c.wl, &packet{
 				buf: message,
 				pos: n,
 			})
+			return syscall.EAGAIN
 		}
 	}
 	return e
@@ -103,10 +104,9 @@ func (c *C) SendAgain() error {
 	for len(c.wl) > 0 {
 		switch n, e := syscall.Write(c.fd, c.wl[0].buf[c.wl[0].pos:]); e {
 		case syscall.EAGAIN:
-			//c.Println("write", n, "bytes", uintptr(syscall.EAGAIN), e)
+			// c.Println("write", n, "bytes", uintptr(syscall.EAGAIN), e)
 			// 当双方buffer全满时，e=11，n=-1
-			// 预防万一
-			if n < 0 {
+			if n > 0 {
 				c.wl[0].pos += n
 			}
 			return e
@@ -116,7 +116,9 @@ func (c *C) SendAgain() error {
 			if n == len(c.wl[0].buf[c.wl[0].pos:]) {
 				c.wl = c.wl[1:]
 			} else {
+				// 本次数据未完全写入时，表示Send-Q已满
 				c.wl[0].pos += n
+				return syscall.EAGAIN
 			}
 		default:
 			return e

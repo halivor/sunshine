@@ -1,19 +1,14 @@
 # tcp connection
 ```
- 消息内容 "message" , 接收Ack消息
- 单核CPU, > 35000连接, 每秒 4条消息, CPU达到100%, PPS >  28万
- 单核CPU, >  8000连接, 每秒20条消息, CPU达到100%, PPS ~= 32万
-```
-```
-Header  // 内部通讯格式，与外部无关
+Header  // peer与agent通讯格式，与外部无关
 
 SHeader // 与客户端交互格式，字符串头
 > ver   "10"
 > typ   'B' 二进制头
->      'S' 字符串头
+>       'S' 字符串头
 > opt   '0' 普通消息
->      '1' 消息需要ack
->      'A' ack消息
+>       '1' 消息需要ack
+>       'A' ack消息
 > cmd       命令号 100, typ = 'S', cmd = '0100' 
 >                       typ = 'B', cmd =   100 , 使用大端表示
 > seq       待确认消息sequence
