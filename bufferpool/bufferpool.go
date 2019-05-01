@@ -1,69 +1,71 @@
 package bufferpool
 
-import (
-	"container/list"
-
-	cnf "github.com/halivor/frontend/config"
+const (
+	BUF_MIN_LEN = 1024
+	BUF_MAX_LEN = 4 * 1024 * 1024
 )
 
-type BufferPool struct {
-	idle  *list.List
-	large map[int]*list.List
+type BufferPool interface {
 }
 
-var gbp *BufferPool
+// bufferpool =
+//   1024 * 8000 * 4 = 32M
+//   2048 * 8000 * 2 = 32M
+//   4096 * 4000     = 16M
+//   8192 * 2000     = 16M
+type bufferpool struct {
+	memList map[uint16][][]byte
+}
 
-func init() {
-	gbp = &BufferPool{
-		idle:  list.New(),
-		large: make(map[int]*list.List),
+var memSize map[uint16]uint16 = map[uint16]uint16{
+	1024: 8000 * 4,
+	2048: 8000 * 2,
+	4096: 4000,
+	8192: 2000,
+}
+
+func New() BufferPool {
+	bp := &bufferpool{
+		memList: make(map[uint16][][]byte, 32),
 	}
-}
-
-func New() *BufferPool {
-	return &BufferPool{}
-}
-
-func Alloc() []byte {
-	return gbp.Alloc()
-}
-
-func AllocLarge(length int) []byte {
-	return gbp.AllocLarge(length)
-}
-
-func Release(buffer []byte) {
-	gbp.Release(buffer)
-}
-
-// length <= 4K
-// length >= 4M
-func (bp *BufferPool) Alloc() []byte {
-	return make([]byte, cnf.BUF_MIN_LEN)
-	if bp.idle.Len() > 0 {
-		if buffer, ok := bp.idle.Remove(bp.idle.Front()).([]byte); ok {
-			return buffer
+	for size, num := range memSize {
+		slice := make([][]byte, num)
+		pool := make([]byte, size*num)
+		for pre, cur := uint16(0), uint16(1); cur < num; pre, cur = cur*size, cur+1 {
+			slice[cur-1] = pool[pre : cur*size]
 		}
+		bp.memList[size] = slice
 	}
-	return make([]byte, cnf.BUF_MIN_LEN)
+	return bp
 }
 
-func (bp *BufferPool) AllocLarge(length int) []byte {
-	if length <= cnf.BUF_MIN_LEN {
-		return bp.Alloc()
-	}
-	if length >= 4*1024*1024 {
-		return make([]byte, length+(^length&(cnf.BUF_MIN_LEN-1)+1)&(cnf.BUF_MIN_LEN-1))
-	}
-	if _, ok := bp.large[length+(^length&(cnf.BUF_MIN_LEN-1)+1)&(cnf.BUF_MIN_LEN-1)]; ok {
-	}
-	return make([]byte, length+(^length&(cnf.BUF_MIN_LEN-1)+1)&(cnf.BUF_MIN_LEN-1))
+func (bp *bufferpool) newP(buf []byte) *P {
+	return &P{}
 }
 
-func (bp *BufferPool) Release(buffer []byte) {
-	switch {
-	case cap(buffer) == cnf.BUF_MIN_LEN:
-	case cap(buffer) >= cnf.BUF_MAX_LEN:
-	default:
-	}
+// length <= 2K
+// length >= 4M
+func (bp *bufferpool) Alloc() []byte {
+	/*return make([]byte, BUF_MIN_LEN)*/
+	//if bp.stdList.Len() > 0 {
+	//if buffer, ok := bp.stdList.Remove(bp.stdList.Front()).([]byte); ok {
+	//return buffer
+	//}
+	/*}*/
+	return nil
+}
+
+func (bp *bufferpool) AllocLarge(length int) []byte {
+	/*if length <= BUF_MIN_LEN {*/
+	//return bp.Alloc()
+	//}
+	//if length >= 4*1024*1024 {
+	//return make([]byte, length+(^length&(BUF_MIN_LEN-1)+1)&(BUF_MIN_LEN-1))
+	//}
+	//if _, ok := bp.largeList[length+(^length&(BUF_MIN_LEN-1)+1)&(BUF_MIN_LEN-1)]; ok {
+	/*}*/
+	return nil
+}
+
+func (bp *bufferpool) Release(buffer []byte) {
 }
