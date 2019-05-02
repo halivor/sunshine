@@ -55,10 +55,11 @@ func New(addr string, epr ep.EventPool, mw m.Middleware) (a *Agent, e error) {
 		return nil, e
 	}
 
+	buf, _ := bp.Alloc(1024)
 	return &Agent{
 		ev:         ep.EV_READ,
 		addr:       addr,
-		buf:        bp.Alloc(),
+		buf:        buf,
 		C:          C,
 		EventPool:  epr,
 		Middleware: mw,
@@ -80,7 +81,7 @@ func (a *Agent) CallBack(ev ep.EP_EVENT) {
 		if a.pos < p.HLen || a.pos < p.HLen+h.Len() {
 			// 消息超大，增大buffer
 			if a.pos == cap(a.buf) {
-				buf := bp.AllocLarge(cap(a.buf) * 2)
+				buf, _ := bp.Alloc(cap(a.buf) * 2)
 				copy(buf, a.buf)
 				a.buf = buf
 			}
@@ -109,7 +110,7 @@ func (a *Agent) process() {
 		}
 	}
 	// 不利用buffer, 防止发送端阻塞时，数据被覆盖
-	a.buf = bp.Alloc()
+	a.buf, _ = bp.Alloc(1024)
 	a.pos = 0
 	if beg < end {
 		copy(a.buf, buf[beg:end])

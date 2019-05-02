@@ -26,10 +26,11 @@ type Peer struct {
 	*log.Logger
 }
 
-func New(conn c.Conn, epr ep.EventPool, pm Manager) (p *Peer) {
-	p = &Peer{
+func New(conn c.Conn, epr ep.EventPool, pm Manager) *Peer {
+	buf, _ := bp.Alloc(1024)
+	return &Peer{
 		ev:  ep.EV_READ,
-		rb:  bp.Alloc(),
+		rb:  buf,
 		pos: pkt.HLen,
 		ps:  PS_ESTAB,
 
@@ -38,7 +39,6 @@ func New(conn c.Conn, epr ep.EventPool, pm Manager) (p *Peer) {
 		EventPool: epr,
 		Logger:    cnf.NewLogger(fmt.Sprintf("[peer(%d)]", conn.Fd())),
 	}
-	return
 }
 
 func (p *Peer) CallBack(ev ep.EP_EVENT) {

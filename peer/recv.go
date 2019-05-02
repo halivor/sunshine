@@ -86,7 +86,7 @@ func (p *Peer) auth() (e error) {
 
 	// 转发packet消息
 	p.pkt = p.rb[:plen]
-	p.rb = bp.Alloc()
+	p.rb, _ = bp.Alloc(1024)
 	if p.pos > plen {
 		copy(p.rb[pkt.HLen:], p.pkt[plen:p.pos])
 	}
@@ -122,7 +122,7 @@ func (p *Peer) parse() (e error) {
 	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
 
 	p.pkt = p.rb[:plen]
-	p.rb = bp.Alloc()
+	p.rb, _ = bp.Alloc(1024)
 	if p.pos > plen {
 		copy(p.rb[pkt.HLen:], p.pkt[plen:p.pos])
 	}
