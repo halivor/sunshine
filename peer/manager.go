@@ -4,9 +4,9 @@ import (
 	"log"
 	"unsafe"
 
-	cnf "github.com/halivor/frontend/config"
-	pkt "github.com/halivor/frontend/packet"
 	mw "github.com/halivor/goevent/middleware"
+	cnf "github.com/halivor/sunshine/config"
+	pkt "github.com/halivor/sunshine/packet"
 )
 
 type Manager interface {
@@ -45,24 +45,24 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 func (pm *manager) Add(p *Peer) {
 	// 超时重连
 	pm.peers[p] = struct{}{}
-	pm.Println("add", p.Uid)
-	if _, ok := pm.users[p.Uid]; !ok {
-		pm.users[p.Uid] = make(map[*Peer]struct{}, 16)
+	pm.Println("add", p.header.Uid)
+	if _, ok := pm.users[p.header.Uid]; !ok {
+		pm.users[p.header.Uid] = make(map[*Peer]struct{}, 16)
 	}
-	pm.users[p.Uid][p] = struct{}{}
+	pm.users[p.header.Uid][p] = struct{}{}
 
-	if _, ok := pm.rooms[p.Cid]; !ok {
-		pm.rooms[p.Cid] = make(map[*Peer]struct{}, 128)
+	if _, ok := pm.rooms[p.header.Cid]; !ok {
+		pm.rooms[p.header.Cid] = make(map[*Peer]struct{}, 128)
 	}
-	pm.rooms[p.Cid][p] = struct{}{}
+	pm.rooms[p.header.Cid][p] = struct{}{}
 }
 
 func (pm *manager) Del(p *Peer) {
 	delete(pm.peers, p)
-	if ps, ok := pm.users[p.Uid]; ok {
+	if ps, ok := pm.users[p.header.Uid]; ok {
 		delete(ps, p)
 	}
-	if cp, ok := pm.users[p.Cid]; ok {
+	if cp, ok := pm.users[p.header.Cid]; ok {
 		delete(cp, p)
 	}
 }

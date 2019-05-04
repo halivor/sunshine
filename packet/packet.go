@@ -2,55 +2,40 @@ package packet
 
 import (
 	"unsafe"
+
+	bp "github.com/halivor/sunshine/bufferpool"
 )
 
-type Type int8
-
-const (
-	T_AUTH Type = 1 + iota
-	T_STRING
-	T_BINARY
-	T_RPOTO
-)
-
-type Header struct {
-	Ver uint16
-	Nid uint16 // node id
-	Uid uint32 // user id
-	Cid uint32 // user type
-	Cmd CmdID
-	len uint32
-	Res [12]byte
+type P struct {
+	Len int
+	Cap int
+	Buf []byte
+	ptr uintptr
 }
 
-func (h *Header) Len() int {
-	return int(h.len)
-}
-func (h *Header) SetLen(len uint32) {
-	h.len = len
-}
-
-type UHeader interface {
-	Ver() int
-	Opt() int
-	Cmd() int
-	Seq() uint64
-	Len() int
+func NewPkt() *P {
+	buf := bp.Alloc(2048)
+	p := (*P)(unsafe.Pointer(&buf[0]))
+	p.Len = 0
+	p.Cap = 2048 - int(unsafe.Offsetof(p.ptr))
+	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
+	return p
 }
 
-const (
-	HLen  = int(unsafe.Sizeof(Header{}))
-	ALen  = int(unsafe.Sizeof(Auth{}))
-	SHLen = int(unsafe.Sizeof(SHeader{}))
-)
+func Alloc(length int) *P {
+	alen := length + int(unsafe.Sizeof(P{}))
+	buf := bp.Alloc(alen)
+	p := (*P)(unsafe.Pointer(&buf[0]))
+	p.Len = 0
+	p.Cap = alen - int(unsafe.Offsetof(p.ptr))
+	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
+	return p
+}
 
-func Parse(pb []byte) UHeader {
-	switch pb[2] {
-	case 'B':
-		return (*BHeader)(unsafe.Pointer(&pb[0]))
-	case 'S':
-		return (*SHeader)(unsafe.Pointer(&pb[0]))
-	}
-	panic("undefined head type")
-	return nil
+func (p *P) Buffer() []byte {
+	return (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
+}
+
+func (p *P) Release() {
+	bp.Release((*(*[1]byte)(unsafe.Pointer(p)))[:])
 }

@@ -6,8 +6,8 @@ import (
 	"os"
 	"syscall"
 
-	_ "github.com/halivor/frontend/bufferpool"
-	cnf "github.com/halivor/frontend/config"
+	_ "github.com/halivor/sunshine/bufferpool"
+	cnf "github.com/halivor/sunshine/config"
 )
 
 const (

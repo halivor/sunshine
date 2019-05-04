@@ -5,21 +5,17 @@ import (
 	"log"
 	"syscall"
 
-	bp "github.com/halivor/frontend/bufferpool"
-	cnf "github.com/halivor/frontend/config"
-	c "github.com/halivor/frontend/connection"
-	pkt "github.com/halivor/frontend/packet"
 	ep "github.com/halivor/goevent/eventpool"
+	cnf "github.com/halivor/sunshine/config"
+	c "github.com/halivor/sunshine/connection"
+	pkt "github.com/halivor/sunshine/packet"
 )
 
 type Peer struct {
-	rb  []byte
-	pos int
-	pkt []byte
-	ev  ep.EP_EVENT
-	ps  peerStat
-
-	pkt.Header
+	ev     ep.EP_EVENT
+	ps     peerStat
+	rp     *pkt.P
+	header pkt.Header
 	Manager
 	c.Conn
 	ep.EventPool
@@ -27,12 +23,10 @@ type Peer struct {
 }
 
 func New(conn c.Conn, epr ep.EventPool, pm Manager) *Peer {
-	buf, _ := bp.Alloc(1024)
 	return &Peer{
-		ev:  ep.EV_READ,
-		rb:  buf,
-		pos: pkt.HLen,
-		ps:  PS_ESTAB,
+		ev: ep.EV_READ,
+		ps: PS_ESTAB,
+		rp: pkt.NewPkt(),
 
 		Manager:   pm,
 		Conn:      conn,

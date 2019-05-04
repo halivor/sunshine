@@ -5,26 +5,25 @@ import (
 	"syscall"
 	"unsafe"
 
-	bp "github.com/halivor/frontend/bufferpool"
-	cnf "github.com/halivor/frontend/config"
-	pkt "github.com/halivor/frontend/packet"
+	bp "github.com/halivor/sunshine/bufferpool"
+	cnf "github.com/halivor/sunshine/config"
+	pkt "github.com/halivor/sunshine/packet"
 )
 
 func (p *Peer) recv() error {
 	for {
-		n, e := syscall.Read(p.Fd(), p.rb[p.pos:])
-		switch {
+		switch n, e := syscall.Read(p.Fd(), p.rp.Buf[p.rp.Len:]); {
 		case e != nil:
-			if e == syscall.EAGAIN {
-				p.Println("read eagain", e, n)
-			}
 			return e
 		case n == 0:
 			return os.ErrClosed
 		default:
-			p.pos += n
-			if e := p.process(); e != nil /*&& e != syscall.EAGAIN */ {
+			p.rp.Len += n
+			if e := p.process(); e != nil {
 				return e
+			}
+			if n < p.rp.Cap {
+				return nil
 			}
 		}
 	}
@@ -34,25 +33,14 @@ func (p *Peer) process() error {
 	for {
 		switch p.ps {
 		case PS_ESTAB:
-			p.Println("estab", p.pos, string(p.rb[pkt.HLen:p.pos]))
+			p.Println("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
 			if e := p.auth(); e != nil {
 				return e
 			}
+			p.Send([]byte(pkt.AUTH_SUCC))
 		case PS_NORMAL:
-			if p.pos < pkt.HLen+pkt.SHLen {
-				return syscall.EAGAIN
-			}
 			if e := p.parse(); e != nil {
 				return e
-			}
-			h := (*pkt.Header)(unsafe.Pointer(&p.pkt[0]))
-			//p.Println(p.Header, string(p.pkt[pkt.HLen:pkt.HLen+h.Len()]))
-			switch h.Cmd {
-			case pkt.C_PING:
-				p.Send([]byte(pkt.PONG))
-			default:
-				p.Println(h.Cmd)
-				p.Transfer(p.pkt)
 			}
 		default:
 			return os.ErrInvalid
@@ -62,41 +50,40 @@ func (p *Peer) process() error {
 }
 func (p *Peer) auth() (e error) {
 	defer func() {
-		if r := recover(); r != nil {
+		switch r := recover(); {
+		case r != nil:
 			p.Println("check =>", r)
 			e = os.ErrInvalid
-		} else {
-			// 用户信息结构
+		case e == nil:
 			p.Add(p)
 		}
 	}()
-	a := (*pkt.Auth)(unsafe.Pointer(&p.rb[pkt.HLen]))
-	plen := pkt.HLen + pkt.ALen + a.Len()
-	if p.pos < pkt.HLen+pkt.ALen || p.pos < plen {
-		// 头长度不够，继续读取
+	rp := p.rp
+	a := (*pkt.Auth)(unsafe.Pointer(&rp.Buf[0]))
+	plen := pkt.ALen + a.Len()
+	if rp.Len < pkt.ALen || rp.Len < plen {
 		return syscall.EAGAIN
 	}
 
-	p.Ver = uint16(a.Ver())
-	p.Nid = cnf.NodeId
-	p.Uid = uint32(a.Uid())
-	p.Cid = uint32(a.Cid())
+	p.header.Ver = uint16(a.Ver())
+	p.header.Nid = cnf.NodeId
+	p.header.Uid = uint32(a.Uid())
+	p.header.Cid = uint32(a.Cid())
 	p.ps = PS_NORMAL
 	// verify failed os.ErrInvalid
 
 	// 转发packet消息
-	p.pkt = p.rb[:plen]
-	p.rb, _ = bp.Alloc(1024)
-	if p.pos > plen {
-		copy(p.rb[pkt.HLen:], p.pkt[plen:p.pos])
+	tlen := pkt.HLen + plen
+	tb := bp.Alloc(tlen)
+	*(*pkt.Header)(unsafe.Pointer(&tb[0])) = p.header
+	copy(tb[pkt.HLen:tlen], rp.Buf[:plen])
+	p.Transfer(tb[:tlen])
+	bp.Release(tb)
+
+	if rp.Len > plen {
+		copy(rp.Buf, rp.Buf[plen:rp.Len])
 	}
-	p.pos = pkt.HLen + p.pos - plen
-	p.Println("auth remain", p.pos, string(p.rb[pkt.HLen:p.pos]))
-
-	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
-	p.Transfer(p.pkt)
-	p.Send([]byte(pkt.AUTH_SUCC))
-
+	rp.Len = rp.Len - plen
 	return nil
 }
 func (p *Peer) parse() (e error) {
@@ -106,26 +93,36 @@ func (p *Peer) parse() (e error) {
 			e = os.ErrInvalid
 		}
 	}()
+	rp := p.rp
 	// 用户包长度校验
-	sh := pkt.Parse(p.rb[pkt.HLen:])
-	plen := pkt.HLen + pkt.SHLen + sh.Len()
-	if p.pos < plen {
+	uh := pkt.Parse(rp.Buf)
+	plen := pkt.SHLen + uh.Len()
+	if rp.Len < plen {
 		return syscall.EAGAIN
 	}
-
-	if sh.Len() > 4*1024 {
+	if uh.Len() > 4*1024 {
 		return os.ErrInvalid
 	}
-	p.Header.Cmd = pkt.CmdID(sh.Cmd())
-	p.Header.SetLen(uint32(pkt.SHLen + sh.Len()))
 
-	*(*pkt.Header)(unsafe.Pointer(&p.rb[0])) = p.Header
+	p.header.Cmd = pkt.CmdID(uh.Cmd())
+	p.header.SetLen(uint32(pkt.SHLen + uh.Len()))
 
-	p.pkt = p.rb[:plen]
-	p.rb, _ = bp.Alloc(1024)
-	if p.pos > plen {
-		copy(p.rb[pkt.HLen:], p.pkt[plen:p.pos])
+	p.Println("cmd", p.header.Cmd, rp.Buf[:plen])
+	switch p.header.Cmd {
+	case pkt.C_PING:
+		p.Send([]byte(pkt.PONG))
+	default:
+		tlen := pkt.HLen + plen
+		tb := bp.Alloc(tlen)
+		*(*pkt.Header)(unsafe.Pointer(&tb[0])) = p.header
+		copy(tb[pkt.HLen:tlen], rp.Buf[:plen])
+		p.Transfer(tb)
+		bp.Release(tb)
 	}
-	p.pos = pkt.HLen + p.pos - plen
+
+	if rp.Len > plen {
+		copy(rp.Buf, rp.Buf[plen:rp.Len])
+	}
+	rp.Len = rp.Len - plen
 	return nil
 }

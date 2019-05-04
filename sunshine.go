@@ -4,11 +4,11 @@ import (
 	"log"
 	"sync"
 
-	ac "github.com/halivor/frontend/acceptor"
-	ag "github.com/halivor/frontend/agent"
-	_ "github.com/halivor/frontend/transfer"
 	evp "github.com/halivor/goevent/eventpool"
 	mw "github.com/halivor/goevent/middleware"
+	ac "github.com/halivor/sunshine/acceptor"
+	ag "github.com/halivor/sunshine/agent"
+	_ "github.com/halivor/sunshine/transfer"
 )
 
 var wg sync.WaitGroup

@@ -5,11 +5,11 @@ import (
 	"log"
 	"syscall"
 
-	"github.com/halivor/frontend/config"
-	c "github.com/halivor/frontend/connection"
-	p "github.com/halivor/frontend/peer"
 	ep "github.com/halivor/goevent/eventpool"
 	m "github.com/halivor/goevent/middleware"
+	"github.com/halivor/sunshine/config"
+	c "github.com/halivor/sunshine/connection"
+	p "github.com/halivor/sunshine/peer"
 )
 
 type Acceptor struct {

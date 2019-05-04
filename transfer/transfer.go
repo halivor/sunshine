@@ -3,8 +3,8 @@ package transfer
 import (
 	"log"
 
-	cnf "github.com/halivor/frontend/config"
 	mw "github.com/halivor/goevent/middleware"
+	cnf "github.com/halivor/sunshine/config"
 )
 
 type transfer struct {

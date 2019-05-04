@@ -13,17 +13,19 @@ const (
 type BufferPool interface {
 }
 
-var arrSize [4]uint16 = [4]uint16{1024, 2048, 4096, 8192}
+var arrSize [5]uint16 = [5]uint16{512, 1024, 2048, 4096, 8192}
 var memNum map[uint16]uint16 = map[uint16]uint16{
-	1024: 8000 * 4,
-	2048: 8000 * 2,
+	512:  8000 * 4,
+	1024: 8000 * 2,
+	2048: 8000,
 	4096: 4000,
 	8192: 2000,
 }
 
 // bufferpool =
-//   1024 * 8000 * 4 = 32M
-//   2048 * 8000 * 2 = 32M
+//    512 * 8000 * 4 = 16M
+//   1024 * 8000 * 2 = 16M
+//   2048 * 8000     = 16M
 //   4096 * 4000     = 16M
 //   8192 * 2000     = 16M
 type bufferpool struct {
@@ -37,7 +39,7 @@ func init() {
 	gpool = make([][]byte, 128)
 }
 
-func New() BufferPool {
+func New() *bufferpool {
 	bp := &bufferpool{
 		memCache: make(map[uint16][]uintptr, 32),
 	}
@@ -81,14 +83,14 @@ func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 	return make([]byte, length), nil
 }
 
-func (bp *bufferpool) Release(size uint16, buffer []byte) {
+func (bp *bufferpool) Release(buffer []byte) {
 	if size, ok := bp.memRef[uintptr(unsafe.Pointer(&buffer[0]))]; ok {
 		bp.memCache[size] = append(bp.memCache[size], uintptr(unsafe.Pointer(&buffer[0])))
-		/*if cap(bp.memCache[size])-len(bp.memCache[size]) < 64 {*/
-		//list := make([]uintptr, 0, memNum[size]*10)
-		//copy(list, bp.memCache[size])
-		//bp.memCache[size] = list
-		/*}*/
+		if cap(bp.memCache[size])-len(bp.memCache[size]) < 64 {
+			list := make([]uintptr, 0, memNum[size]*10)
+			copy(list, bp.memCache[size])
+			bp.memCache[size] = list
+		}
 		delete(bp.memRef, uintptr(unsafe.Pointer(&buffer[0])))
 	}
 }
