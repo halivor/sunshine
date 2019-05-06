@@ -36,7 +36,9 @@ func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor
 	if e != nil {
 		return nil, e
 	}
-	log.Println("reuse addr port", c.Reuse(C.Fd(), true))
+	if e := c.Reuse(C.Fd(), true); e != nil {
+		log.Println("reuse addr port failed,", e)
+	}
 	if e = syscall.Bind(C.Fd(), saddr); e != nil {
 		return nil, e
 	}
@@ -56,7 +58,6 @@ func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor
 	return a, nil
 }
 
-// TODO: 细化异常处理流程
 func (a *Acceptor) CallBack(ev ep.EP_EVENT) {
 	if ev&ep.EV_ERROR != 0 {
 		a.Println("epoll error", ev)
@@ -65,6 +66,10 @@ func (a *Acceptor) CallBack(ev ep.EP_EVENT) {
 	}
 	switch fd, _, e := syscall.Accept4(a.Fd(), syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC); e {
 	case syscall.EAGAIN, syscall.EINTR:
+	case syscall.EMFILE, syscall.ENFILE, syscall.ENOBUFS, syscall.ENOMEM:
+		// EMFILE => The per-process limit of open file descriptors has been reached.
+		// ENFILE => The system limit on the total number of open files has been reached.
+		// ENOBUFS, ENOMEM => Not enough free memory. This often means that the memory allocation is limited by the socket buffer limits, not by the system memory.
 	case nil:
 		a.Println("accept connection", fd)
 		a.AddEvent(p.New(c.NewConn(fd), a.EventPool, a.Manager))

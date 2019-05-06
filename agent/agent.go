@@ -120,7 +120,6 @@ func (a *Agent) process() {
 
 func (a *Agent) Consume(message interface{}) interface{} {
 	if msg, ok := message.([]byte); ok {
-		// TODO: 通过中间件发送消息
 		switch h := (*p.Header)(unsafe.Pointer(&msg[0])); h.Cmd {
 		case 2000:
 		case 4000:

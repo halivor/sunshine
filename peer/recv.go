@@ -33,7 +33,7 @@ func (p *Peer) process() error {
 	for {
 		switch p.ps {
 		case PS_ESTAB:
-			p.Println("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
+			//p.Println("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
 			if e := p.auth(); e != nil {
 				return e
 			}
@@ -107,7 +107,6 @@ func (p *Peer) parse() (e error) {
 	p.header.Cmd = pkt.CmdID(uh.Cmd())
 	p.header.SetLen(uint32(pkt.SHLen + uh.Len()))
 
-	p.Println("cmd", p.header.Cmd, rp.Buf[:plen])
 	switch p.header.Cmd {
 	case pkt.C_PING:
 		p.Send([]byte(pkt.PONG))
