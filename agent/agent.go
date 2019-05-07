@@ -96,26 +96,23 @@ func (a *Agent) CallBack(ev ep.EP_EVENT) {
 }
 
 func (a *Agent) process() {
-	buf := a.buf
 	beg := 0
-	end := a.pos
-	h := (*p.Header)(unsafe.Pointer(&buf[0]))
-	for {
+	h := (*p.Header)(unsafe.Pointer(&a.buf[beg]))
+
+	for a.pos-beg < p.HLen || a.pos-beg < p.HLen+h.Len() {
 		//a.Println(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))
-		a.Produce(m.T_TRANSFER, a.tqid, buf[beg:beg+p.HLen+h.Len()])
+		packet := p.Alloc(p.HLen + h.Len())
+		copy(packet.Buf, a.buf[beg:beg+p.HLen+h.Len()])
+		a.Produce(m.T_TRANSFER, a.tqid, packet)
+
 		beg += p.HLen + h.Len()
-		h = (*p.Header)(unsafe.Pointer(&buf[beg]))
-		if end-beg <= p.HLen || end-beg < p.HLen+h.Len() {
-			break
-		}
+		h = (*p.Header)(unsafe.Pointer(&a.buf[beg]))
 	}
 	// 不利用buffer, 防止发送端阻塞时，数据被覆盖
-	a.buf = bp.Alloc(2048)
-	a.pos = 0
-	if beg < end {
-		copy(a.buf, buf[beg:end])
-		a.pos = end - beg
+	if a.pos-beg > 0 {
+		copy(a.buf, a.buf[beg:a.pos])
 	}
+	a.pos -= beg
 }
 
 func (a *Agent) Consume(message interface{}) interface{} {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"syscall"
 
-	_ "github.com/halivor/sunshine/bufferpool"
 	cnf "github.com/halivor/sunshine/config"
 )
 
@@ -19,13 +18,9 @@ type Conn interface {
 	Fd() int
 	SendAgain() error
 	Send(message []byte) error
+	SendBuffer(buf buffer) error
 	Recv(buf []byte) (int, error)
 	Close()
-}
-
-type packet struct {
-	buf []byte
-	pos int
 }
 
 type C struct {
@@ -124,6 +119,14 @@ func (c *C) SendAgain() error {
 			return e
 		}
 	}
+	return nil
+}
+
+func (c *C) SendBuffer(packet buffer) error {
+	return nil
+}
+
+func (c *C) send(buf []byte) error {
 	return nil
 }
 

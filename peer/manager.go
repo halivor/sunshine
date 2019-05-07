@@ -67,10 +67,10 @@ func (pm *manager) Del(p *Peer) {
 	}
 }
 
-func (pm *manager) unicast(uid uint32, message []byte) {
+func (pm *manager) unicast(uid uint32, p *pkt.P) {
 	if us, ok := pm.users[uid]; ok {
 		for usr, _ := range us {
-			usr.Send(message[pkt.HLen:])
+			usr.Send(p.Buffer())
 		}
 	}
 }
@@ -91,17 +91,16 @@ func (pm *manager) broadcast(cid uint32, message []byte) {
 }
 
 func (pm *manager) Consume(message interface{}) interface{} {
-	if data, ok := message.([]byte); ok {
-		h := (*pkt.Header)(unsafe.Pointer(&data[0]))
+	if p, ok := message.(*pkt.P); ok {
+		h := (*pkt.Header)(unsafe.Pointer(&p.Buf[0]))
 		switch {
 		case h.Uid > 0:
 			pm.Println("unicast", h.Uid)
-			pm.unicast(h.Uid, data)
+			pm.unicast(h.Uid, p)
 		default:
 			//pm.Println("broadcast", h.Uid, h.Cid)
-			pm.broadcast(h.Cid, data)
+			pm.broadcast(h.Cid, p.Buf[:p.Len])
 		}
-
 	}
 	return nil
 }

@@ -63,37 +63,51 @@ func (bp *bufferpool) allocMemory(size, num int) []uintptr {
 }
 
 func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
+	ptr, e := bp.AllocPointer(length)
+	if e != nil {
+		return nil, e
+	}
+	size := bp.memRef[ptr]
+	buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(ptr))))[:size]
+	return buf, nil
+}
+
+func (bp *bufferpool) Release(buf []byte) {
+	bp.ReleasePointer(uintptr(unsafe.Pointer(&buf[0])))
+}
+
+func (bp *bufferpool) AllocPointer(length int) (p uintptr, e error) {
 	for i := 0; i < len(arrSize); i++ {
 		size := arrSize[i]
 		if length < size {
 			if mc, ok := bp.memCache[size]; ok {
 				switch {
 				case len(mc) == 0:
-					return nil, os.ErrInvalid
+					return 0, os.ErrInvalid
 				case len(mc) == 1:
-					buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(mc[0]))))[:size]
+					p = mc[0]
 					num := memCnt[size]
 					bp.memCache[size] = bp.allocMemory(num, size)
 				default:
-					buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(mc[0]))))[:size]
+					p = mc[0]
 					bp.memCache[size] = mc[1:]
 				}
-				bp.memRef[uintptr(unsafe.Pointer(&buf[0]))] = size
-				return buf, nil
+				bp.memRef[p] = size
+				return p, nil
 			}
 		}
 	}
-	return make([]byte, length), nil
+	return 0, os.ErrInvalid
 }
 
-func (bp *bufferpool) Release(buffer []byte) {
-	if size, ok := bp.memRef[uintptr(unsafe.Pointer(&buffer[0]))]; ok {
-		bp.memCache[size] = append(bp.memCache[size], uintptr(unsafe.Pointer(&buffer[0])))
+func (bp *bufferpool) ReleasePointer(ptr uintptr) {
+	if size, ok := bp.memRef[ptr]; ok {
+		bp.memCache[size] = append(bp.memCache[size], ptr)
 		if cap(bp.memCache[size])-len(bp.memCache[size]) < 64 {
 			list := make([]uintptr, 0, memCnt[size]*10)
 			copy(list, bp.memCache[size])
 			bp.memCache[size] = list
 		}
-		delete(bp.memRef, uintptr(unsafe.Pointer(&buffer[0])))
+		delete(bp.memRef, ptr)
 	}
 }

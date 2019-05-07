@@ -74,6 +74,18 @@ func (p *Peer) Send(data []byte) {
 	}
 }
 
+func (p *Peer) SendBuffer(ps *pkt.P) {
+	switch e := p.Conn.SendBuffer(ps); e {
+	case syscall.EAGAIN:
+		p.ev |= ep.EV_WRITE
+		p.ModEvent(p)
+	case nil:
+		return
+	default:
+		p.Release()
+	}
+}
+
 func (p *Peer) Event() ep.EP_EVENT {
 	return p.ev
 }
