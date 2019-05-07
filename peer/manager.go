@@ -70,7 +70,7 @@ func (pm *manager) Del(p *Peer) {
 func (pm *manager) unicast(uid uint32, p *pkt.P) {
 	if us, ok := pm.users[uid]; ok {
 		for usr, _ := range us {
-			usr.Send(p.Buffer())
+			usr.Send(p)
 		}
 	}
 }
@@ -80,12 +80,12 @@ func (pm *manager) broadcast(cid uint32, message []byte) {
 	case cid > 0:
 		if r, ok := pm.rooms[cid]; ok {
 			for p, _ := range r {
-				p.Send(message[pkt.HLen:])
+				p.Send(nil)
 			}
 		}
 	default:
 		for p, _ := range pm.peers {
-			p.Send(message[pkt.HLen:])
+			p.Send(nil)
 		}
 	}
 }

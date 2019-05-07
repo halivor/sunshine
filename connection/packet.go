@@ -18,8 +18,8 @@ type packet struct {
 }
 
 func newPacket() *packet {
-	buf := bp.Alloc(unsafe.Sizeof(packet{}))
-	return nil
+	ptr := bp.AllocPointer(int(unsafe.Sizeof(packet{})))
+	return (*packet)(ptr)
 }
 
 func resPacket(p *packet) {

@@ -16,13 +16,14 @@ const (
 
 type Conn interface {
 	Fd() int
-	SendAgain() error
-	Send(message []byte) error
+	//SendAgain() error
+	Send(message []byte) (int, error)
 	SendBuffer(buf buffer) error
 	Recv(buf []byte) (int, error)
 	Close()
 }
 
+// TODO: connection nocache/connection buffercache
 type C struct {
 	fd int
 	ss SockStat
@@ -57,7 +58,14 @@ func NewTcpConn() (*C, error) {
 	}, nil
 }
 
-func (c *C) Send(message []byte) error {
+func (c *C) Send(data []byte) (int, error) {
+	if c.Closed() {
+		return 0, os.ErrClosed
+	}
+	return syscall.Write(c.fd, data)
+}
+
+func (c *C) SendCache(message []byte) error {
 	if c.Closed() || len(c.wl) >= MAX_SENDQ_SIZE {
 		return os.ErrClosed
 	}
@@ -92,7 +100,7 @@ func (c *C) Send(message []byte) error {
 	return e
 }
 
-func (c *C) SendAgain() error {
+func (c *C) SendCacheAgain() error {
 	if c.Closed() {
 		return os.ErrClosed
 	}

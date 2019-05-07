@@ -37,7 +37,7 @@ func (p *Peer) process() error {
 			if e := p.auth(); e != nil {
 				return e
 			}
-			p.Send([]byte(pkt.AUTH_SUCC))
+			p.Send(pkt.AuthSucc)
 		case PS_NORMAL:
 			if e := p.parse(); e != nil {
 				return e
@@ -109,7 +109,7 @@ func (p *Peer) parse() (e error) {
 
 	switch p.header.Cmd {
 	case pkt.C_PING:
-		p.Send([]byte(pkt.PONG))
+		p.Send(pkt.Pong)
 	default:
 		tlen := pkt.HLen + plen
 		tb := bp.Alloc(tlen)

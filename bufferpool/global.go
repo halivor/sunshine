@@ -39,11 +39,11 @@ func Release(buf []byte) {
 	atomic.StoreUint32(&locker, 0)
 }
 
-func ReleasePointer(ptr uintptr) {
+func ReleasePointer(ptr unsafe.Pointer) {
 	for atomic.CompareAndSwapUint32(&locker, 0, 1) {
 		runtime.Gosched()
 	}
-	gbp.ReleasePointer(ptr)
+	gbp.ReleasePointer(uintptr(ptr))
 	atomic.StoreUint32(&locker, 0)
 
 }

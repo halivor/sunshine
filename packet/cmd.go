@@ -24,6 +24,15 @@ const (
 	PONG      = "10S10100123456780004RESERVEDPONG"
 )
 
+var Pong, AuthSucc *P
+
+func init() {
+	AuthSucc = Alloc(len(AUTH_SUCC))
+	copy(AuthSucc.Buf, AUTH_SUCC)
+	Pong = Alloc(len(PONG))
+	copy(Pong.Buf, PONG)
+}
+
 func (id CmdID) ToString() string {
 	return strconv.Itoa(int(id))
 }
