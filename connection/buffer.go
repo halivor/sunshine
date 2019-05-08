@@ -24,7 +24,7 @@ type BConn interface {
 func NewConnWithBuffer(fd int) BConn {
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
-	return &C{
+	return &c{
 		fd:     fd,
 		ss:     ESTAB,
 		wb:     make([]buffer, 0, MAX_SENDQ_SIZE),
@@ -32,14 +32,14 @@ func NewConnWithBuffer(fd int) BConn {
 	}
 }
 
-func NewTcpConnWithBuffer() (*C, error) {
+func NewTcpConnWithBuffer() (*c, error) {
 	fd, e := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
 	if e != nil {
 		return nil, e
 	}
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
-	return &C{
+	return &c{
 		fd:     fd,
 		ss:     CREATE,
 		wb:     make([]buffer, 0, MAX_SENDQ_SIZE),

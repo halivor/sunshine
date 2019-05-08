@@ -14,6 +14,7 @@ func (p *Peer) recv() error {
 	for {
 		switch n, e := syscall.Read(p.Fd(), p.rp.Buf[p.rp.Len:]); {
 		case e != nil:
+			p.Println("read", e)
 			return e
 		case n == 0:
 			return os.ErrClosed
@@ -35,14 +36,20 @@ func (p *Peer) process() error {
 		case PS_ESTAB:
 			//p.Println("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
 			if e := p.auth(); e != nil {
+				p.Println("auth", e)
 				return e
 			}
 			p.Send(pkt.AuthSucc)
 		case PS_NORMAL:
+			if p.rp.Len < pkt.HLen {
+				return syscall.EAGAIN
+			}
+			//p.Println("normal", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
 			if e := p.parse(); e != nil {
 				return e
 			}
 		default:
+			p.Println("unknown status")
 			return os.ErrInvalid
 		}
 	}
@@ -83,7 +90,7 @@ func (p *Peer) auth() (e error) {
 	if rp.Len > plen {
 		copy(rp.Buf, rp.Buf[plen:rp.Len])
 	}
-	rp.Len = rp.Len - plen
+	rp.Len -= plen
 	return nil
 }
 func (p *Peer) parse() (e error) {
@@ -97,7 +104,7 @@ func (p *Peer) parse() (e error) {
 	// 用户包长度校验
 	uh := pkt.Parse(rp.Buf)
 	plen := pkt.SHLen + uh.Len()
-	if rp.Len < plen {
+	if rp.Len < pkt.SHLen {
 		return syscall.EAGAIN
 	}
 	if uh.Len() > 4*1024 {

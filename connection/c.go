@@ -12,7 +12,7 @@ const (
 )
 
 // TODO: connection nocache/connection buffercache
-type C struct {
+type c struct {
 	fd int
 	ss SockStat
 	cc bool     // cached
@@ -22,14 +22,14 @@ type C struct {
 	*log.Logger
 }
 
-func (c *C) Send(data []byte) (int, error) {
+func (c *c) Send(data []byte) (int, error) {
 	if c.Closed() {
 		return 0, os.ErrClosed
 	}
 	return syscall.Write(c.fd, data)
 }
 
-func (c *C) SendBuffer(pb buffer) (e error) {
+func (c *c) SendBuffer(pb buffer) (e error) {
 	if c.Closed() || len(c.wb) >= MAX_SENDQ_SIZE {
 		return os.ErrClosed
 	}
@@ -52,7 +52,7 @@ func (c *C) SendBuffer(pb buffer) (e error) {
 	return e
 }
 
-func (c *C) SendBufferAgain() error {
+func (c *c) SendBufferAgain() error {
 	if c.Closed() {
 		return os.ErrClosed
 	}
@@ -83,32 +83,25 @@ func (c *C) SendBufferAgain() error {
 	return nil
 }
 
-func (c *C) Recv(buf []byte) (int, error) {
-	if c.Closed() {
-		return 0, os.ErrClosed
-	}
-	switch c.ss {
-	case ESTAB:
+func (c *c) Recv(buf []byte) (int, error) {
+	switch {
+	case c.ss == ESTAB:
 		return syscall.Read(c.fd, buf)
-	case CLOSED:
+	case c.ss == CLOSED:
 		return 0, os.ErrClosed
 	}
 	return 0, os.ErrInvalid
 }
 
-func (c *C) Closed() bool {
-	if c.ss == CLOSED {
-		return true
-	}
-	return false
+func (c *c) Closed() bool {
+	return c.ss == CLOSED
 }
 
-func (c *C) Close() {
+func (c *c) Close() {
 	syscall.Close(c.fd)
 	c.ss = CLOSED
-	c.wb = nil
 }
 
-func (c *C) Fd() int {
+func (c *c) Fd() int {
 	return c.fd
 }

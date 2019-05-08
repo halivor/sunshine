@@ -17,21 +17,21 @@ type Conn interface {
 func NewConn(fd int) Conn {
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
-	return &C{
+	return &c{
 		fd:     fd,
 		ss:     ESTAB,
 		Logger: cnf.NewLogger(fmt.Sprintf("[sock(%d)] ", fd)),
 	}
 }
 
-func NewTcpConn() (*C, error) {
+func NewTcpConn() (*c, error) {
 	fd, e := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
 	if e != nil {
 		return nil, e
 	}
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
-	return &C{
+	return &c{
 		fd:     fd,
 		ss:     CREATE,
 		Logger: cnf.NewLogger(fmt.Sprintf("[tcp(%d)] ", fd)),

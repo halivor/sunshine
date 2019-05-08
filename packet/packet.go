@@ -1,7 +1,7 @@
 package packet
 
 import (
-	"log"
+	_ "log"
 	"sync/atomic"
 	"unsafe"
 
@@ -27,7 +27,7 @@ func NewPkt() *P {
 	p.Cap = cap(buf) - int(unsafe.Offsetof(p.ptr))
 	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
 	p.ref = 1
-	log.Println("alloc  ", unsafe.Pointer(&buf[0]))
+	//log.Println("alloc  ", unsafe.Pointer(&buf[0]))
 	return p
 }
 
@@ -39,7 +39,7 @@ func Alloc(length int) *P {
 	p.Cap = cap(buf) - int(unsafe.Offsetof(p.ptr))
 	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
 	p.ref = 1
-	log.Println("alloc  ", unsafe.Pointer(&buf[0]))
+	//log.Println("alloc  ", unsafe.Pointer(&buf[0]))
 	return p
 }
 
@@ -54,7 +54,7 @@ func (p *P) Refefence() *P {
 
 func (p *P) Release() {
 	if atomic.AddInt64(&p.ref, -1) == 0 {
-		log.Println("release", unsafe.Pointer(p))
+		//log.Println("release", unsafe.Pointer(p))
 		bp.Release((*(*[1]byte)(unsafe.Pointer(p)))[:])
 	}
 }

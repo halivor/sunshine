@@ -31,7 +31,7 @@ func New(conn c.Conn, epr ep.EventPool, pm Manager) *Peer {
 		ev: ep.EV_READ,
 		ps: PS_ESTAB,
 		rp: pkt.NewPkt(),
-		wl: make([]*pkt.P, 1024),
+		wl: make([]*pkt.P, 0, 1024),
 		wp: 0,
 
 		Manager:   pm,
@@ -47,6 +47,7 @@ func (p *Peer) CallBack(ev ep.EP_EVENT) {
 		switch e := p.recv(); e {
 		case nil, syscall.EAGAIN:
 		default:
+			log.Println(e, "release")
 			p.Release()
 		}
 	case ev&ep.EV_WRITE != 0:
@@ -67,7 +68,7 @@ func (p *Peer) Send(pd *pkt.P) {
 		}
 		return
 	}
-	switch n, e := p.Conn.Send(pd.Buf); {
+	switch n, e := p.Conn.Send(pd.Buf[:pd.Len]); {
 	case e == nil || e == syscall.EAGAIN:
 		if n < 0 {
 			n = 0
