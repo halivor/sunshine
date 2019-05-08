@@ -6,11 +6,6 @@ import (
 	bp "github.com/halivor/sunshine/bufferpool"
 )
 
-type buffer interface {
-	Buffer() []byte
-	Release()
-}
-
 type packet struct {
 	buffer
 	buf []byte

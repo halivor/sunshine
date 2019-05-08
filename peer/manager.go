@@ -67,25 +67,25 @@ func (pm *manager) Del(p *Peer) {
 	}
 }
 
-func (pm *manager) unicast(uid uint32, p *pkt.P) {
+func (pm *manager) unicast(uid uint32, pd *pkt.P) {
 	if us, ok := pm.users[uid]; ok {
 		for usr, _ := range us {
-			usr.Send(p)
+			usr.Send(pd)
 		}
 	}
 }
 
-func (pm *manager) broadcast(cid uint32, message []byte) {
+func (pm *manager) broadcast(cid uint32, pd *pkt.P) {
 	switch {
 	case cid > 0:
 		if r, ok := pm.rooms[cid]; ok {
 			for p, _ := range r {
-				p.Send(nil)
+				p.Send(pd)
 			}
 		}
 	default:
 		for p, _ := range pm.peers {
-			p.Send(nil)
+			p.Send(pd)
 		}
 	}
 }
@@ -95,11 +95,9 @@ func (pm *manager) Consume(message interface{}) interface{} {
 		h := (*pkt.Header)(unsafe.Pointer(&p.Buf[0]))
 		switch {
 		case h.Uid > 0:
-			pm.Println("unicast", h.Uid)
 			pm.unicast(h.Uid, p)
 		default:
-			//pm.Println("broadcast", h.Uid, h.Cid)
-			pm.broadcast(h.Cid, p.Buf[:p.Len])
+			pm.broadcast(h.Cid, p)
 		}
 	}
 	return nil

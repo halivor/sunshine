@@ -16,7 +16,7 @@ type Acceptor struct {
 	ev   ep.EP_EVENT
 	addr string
 
-	*c.C
+	c.Conn
 	ep.EventPool // event: add, del, mod
 	p.Manager
 
@@ -49,7 +49,7 @@ func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor
 	a = &Acceptor{
 		ev:        ep.EV_READ,
 		addr:      addr,
-		C:         C,
+		Conn:      C,
 		EventPool: epr,
 		Manager:   p.NewManager(mw),
 		Logger:    config.NewLogger(fmt.Sprintf("[accept(%d)] ", C.Fd())),
@@ -82,5 +82,5 @@ func (a *Acceptor) Event() ep.EP_EVENT {
 	return a.ev
 }
 func (a *Acceptor) Release() {
-	a.C.Close()
+	a.Conn.Close()
 }

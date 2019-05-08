@@ -16,8 +16,8 @@ import (
 type Peer struct {
 	ev     ep.EP_EVENT
 	ps     peerStat
-	rp     *pkt.P
-	wl     []*pkt.P // write packet list
+	rp     *pkt.P   // read  buffer
+	wl     []*pkt.P // write buffer list
 	wp     int      // previous packet write position
 	header pkt.Header
 	Manager
@@ -57,24 +57,25 @@ func (p *Peer) CallBack(ev ep.EP_EVENT) {
 	}
 }
 
-func (p *Peer) Send(ps *pkt.P) {
+func (p *Peer) Send(pd *pkt.P) {
 	if len(p.wl) > 0 {
 		switch {
 		case len(p.wl) > 128:
 			p.Release()
 		default:
-			p.wl = append(p.wl, ps)
+			p.wl = append(p.wl, pd)
 		}
 		return
 	}
-	switch n, e := p.Conn.Send(ps.Buf); {
+	switch n, e := p.Conn.Send(pd.Buf); {
 	case e == nil || e == syscall.EAGAIN:
 		if n < 0 {
 			n = 0
 		}
-		if n < ps.Len {
+		if n < pd.Len {
 			// 本次写入，导致socket write buffer满，剩余数据send again
-			p.wl = append(p.wl, ps)
+			// 网络正常时，不会出现此情况
+			p.wl = append(p.wl, pd)
 			p.wp += n
 
 			p.ev |= ep.EV_WRITE
@@ -105,9 +106,11 @@ func (p *Peer) sendAgain() {
 		case syscall.EAGAIN:
 			// 当本次写入时，本方buffer已满时，e=11，n=-1
 			if n > 0 {
+				// 没遇到过这种情况，防止意外
 				p.wp += n
 				if p.wp == p.wl[0].Len {
 					p.wl = p.wl[1:]
+					p.wp = 0
 				}
 			}
 			return
@@ -118,18 +121,6 @@ func (p *Peer) sendAgain() {
 	}
 	p.ev = ep.EV_READ
 	p.ModEvent(p)
-}
-
-func (p *Peer) SendBuffer(ps *pkt.P) {
-	switch e := p.Conn.SendBuffer(ps); e {
-	case syscall.EAGAIN:
-		p.ev |= ep.EV_WRITE
-		p.ModEvent(p)
-	case nil:
-		return
-	default:
-		p.Release()
-	}
 }
 
 func (p *Peer) Event() ep.EP_EVENT {

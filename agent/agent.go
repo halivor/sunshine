@@ -21,7 +21,7 @@ type Agent struct {
 	buf  []byte
 	pos  int
 
-	*c.C
+	c.Conn
 	ep.EventPool
 	tqid m.QId
 	m.Middleware
@@ -60,7 +60,7 @@ func New(addr string, epr ep.EventPool, mw m.Middleware) (a *Agent, e error) {
 		ev:         ep.EV_READ,
 		addr:       addr,
 		buf:        buf,
-		C:          C,
+		Conn:       C,
 		EventPool:  epr,
 		Middleware: mw,
 		Logger:     cnf.NewLogger(fmt.Sprintf("[agent(%d)]", C.Fd())),
@@ -81,21 +81,22 @@ func (a *Agent) CallBack(ev ep.EP_EVENT) {
 		if a.pos < p.HLen || a.pos < p.HLen+h.Len() {
 			// 消息超大，增大buffer
 			if a.pos == cap(a.buf) {
-				buf := bp.Alloc(cap(a.buf) * 2)
-				copy(buf, a.buf)
-				a.buf = buf
+				buf := a.buf
+				a.buf = bp.Alloc(cap(a.buf) * 2)
+				copy(a.buf, buf)
+				bp.Release(buf)
 			}
 			// 消息接收不完整，继续接收
 			return
 		}
-		a.process()
+		a.parse()
 	case ev&ep.EV_WRITE != 0:
 	case ev&ep.EV_ERROR != 0:
 	default:
 	}
 }
 
-func (a *Agent) process() {
+func (a *Agent) parse() {
 	beg := 0
 	h := (*p.Header)(unsafe.Pointer(&a.buf[beg]))
 
@@ -132,5 +133,5 @@ func (a *Agent) Event() ep.EP_EVENT {
 func (a *Agent) Release() {
 	a.Release()
 	a.DelEvent(a)
-	a.C.Close()
+	a.Conn.Close()
 }

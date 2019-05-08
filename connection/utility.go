@@ -8,7 +8,7 @@ import (
 type SockStat int32
 
 const (
-	CREATE SockStat = 1 << iota
+	CREATE SockStat = 1 + iota
 	LISTEN
 	ESTAB
 	CLOSED
