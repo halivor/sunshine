@@ -47,7 +47,6 @@ func (p *Peer) CallBack(ev ep.EP_EVENT) {
 		switch e := p.recv(); e {
 		case nil, syscall.EAGAIN:
 		default:
-			log.Println(e, "release")
 			p.Release()
 		}
 	case ev&ep.EV_WRITE != 0:

@@ -129,6 +129,6 @@ func (p *Peer) parse() (e error) {
 	if rp.Len > plen {
 		copy(rp.Buf, rp.Buf[plen:rp.Len])
 	}
-	rp.Len = rp.Len - plen
+	rp.Len -= plen
 	return nil
 }

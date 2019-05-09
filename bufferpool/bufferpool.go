@@ -79,7 +79,7 @@ func (bp *bufferpool) Release(buf []byte) {
 func (bp *bufferpool) AllocPointer(length int) (p uintptr, e error) {
 	for i := 0; i < len(arrSize); i++ {
 		size := arrSize[i]
-		if length < size {
+		if length <= size {
 			if mc, ok := bp.memCache[size]; ok {
 				switch {
 				case len(mc) == 0:

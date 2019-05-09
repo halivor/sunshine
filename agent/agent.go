@@ -77,12 +77,11 @@ func (a *Agent) CallBack(ev ep.EP_EVENT) {
 		}
 		a.pos += n
 		h := (*p.Header)(unsafe.Pointer(&a.buf[0]))
-		//a.Println("recv", string(a.buf[:a.pos]))
 		if a.pos < p.HLen || a.pos < p.HLen+h.Len() {
 			// 消息超大，增大buffer
-			if a.pos == cap(a.buf) {
+			if a.pos == len(a.buf) {
 				buf := a.buf
-				a.buf = bp.Alloc(cap(a.buf) * 2)
+				a.buf = bp.Alloc(len(a.buf) * 2)
 				copy(a.buf, buf)
 				bp.Release(buf)
 			}
@@ -100,7 +99,7 @@ func (a *Agent) parse() {
 	beg := 0
 	h := (*p.Header)(unsafe.Pointer(&a.buf[beg]))
 
-	for a.pos-beg < p.HLen || a.pos-beg < p.HLen+h.Len() {
+	for a.pos-beg > p.HLen || a.pos-beg >= p.HLen+h.Len() {
 		//a.Println(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))
 		packet := p.Alloc(p.HLen + h.Len())
 		copy(packet.Buf, a.buf[beg:beg+p.HLen+h.Len()])
@@ -131,7 +130,7 @@ func (a *Agent) Event() ep.EP_EVENT {
 }
 
 func (a *Agent) Release() {
-	a.Release()
+	bp.Release(a.buf)
 	a.DelEvent(a)
 	a.Conn.Close()
 }
