@@ -80,6 +80,8 @@ func (p *Peer) Send(pd *pkt.P) {
 
 			p.ev |= ep.EV_WRITE
 			p.ModEvent(p)
+		} else {
+			pd.Release()
 		}
 	default:
 		p.Release()

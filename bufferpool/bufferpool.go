@@ -1,6 +1,7 @@
 package bufferpool
 
 import (
+	_ "log"
 	"os"
 	"unsafe"
 )
@@ -68,12 +69,8 @@ func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 		return nil, e
 	}
 	size := bp.memRef[ptr]
-	buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(ptr))))[:size]
+	buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(ptr))))[:size:size]
 	return buf, nil
-}
-
-func (bp *bufferpool) Release(buf []byte) {
-	bp.ReleasePointer(uintptr(unsafe.Pointer(&buf[0])))
 }
 
 func (bp *bufferpool) AllocPointer(length int) (p uintptr, e error) {
@@ -92,12 +89,17 @@ func (bp *bufferpool) AllocPointer(length int) (p uintptr, e error) {
 					p = mc[0]
 					bp.memCache[size] = mc[1:]
 				}
+				//log.Println("alloc  ", p)
 				bp.memRef[p] = size
 				return p, nil
 			}
 		}
 	}
 	return 0, os.ErrInvalid
+}
+
+func (bp *bufferpool) Release(buf []byte) {
+	bp.ReleasePointer(uintptr(unsafe.Pointer(&buf[0])))
 }
 
 func (bp *bufferpool) ReleasePointer(ptr uintptr) {
@@ -109,5 +111,6 @@ func (bp *bufferpool) ReleasePointer(ptr uintptr) {
 			bp.memCache[size] = list
 		}
 		delete(bp.memRef, ptr)
+		//log.Println("release", ptr)
 	}
 }

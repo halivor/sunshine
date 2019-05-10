@@ -80,10 +80,7 @@ func (a *Agent) CallBack(ev ep.EP_EVENT) {
 		if a.pos < p.HLen || a.pos < p.HLen+h.Len() {
 			// 消息超大，增大buffer
 			if a.pos == len(a.buf) {
-				buf := a.buf
-				a.buf = bp.Alloc(len(a.buf) * 2)
-				copy(a.buf, buf)
-				bp.Release(buf)
+				a.buf = bp.Realloc(a.buf, len(a.buf)*2)
 			}
 			// 消息接收不完整，继续接收
 			return
@@ -101,9 +98,9 @@ func (a *Agent) parse() {
 
 	for a.pos-beg > p.HLen || a.pos-beg >= p.HLen+h.Len() {
 		//a.Println(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))
-		packet := p.Alloc(p.HLen + h.Len())
-		copy(packet.Buf, a.buf[beg:beg+p.HLen+h.Len()])
-		a.Produce(m.T_TRANSFER, a.tqid, packet)
+		pd := p.Alloc(p.HLen + h.Len())
+		copy(pd.Buf, a.buf[beg:beg+p.HLen+h.Len()])
+		a.Produce(m.T_TRANSFER, a.tqid, pd)
 
 		beg += p.HLen + h.Len()
 		h = (*p.Header)(unsafe.Pointer(&a.buf[beg]))

@@ -22,6 +22,13 @@ func Alloc(length int) []byte {
 	return b
 }
 
+func Realloc(src []byte, length int) []byte {
+	dst := Alloc(length)
+	copy(dst, src)
+	Release(src)
+	return dst
+}
+
 func AllocPointer(length int) unsafe.Pointer {
 	for !atomic.CompareAndSwapUint32(&locker, 0, 1) {
 		runtime.Gosched()
@@ -32,11 +39,7 @@ func AllocPointer(length int) unsafe.Pointer {
 }
 
 func Release(buf []byte) {
-	for atomic.CompareAndSwapUint32(&locker, 0, 1) {
-		runtime.Gosched()
-	}
-	gbp.ReleasePointer(uintptr(unsafe.Pointer(&buf[0])))
-	atomic.StoreUint32(&locker, 0)
+	ReleasePointer(unsafe.Pointer(&buf[0]))
 }
 
 func ReleasePointer(ptr unsafe.Pointer) {
@@ -45,5 +48,4 @@ func ReleasePointer(ptr unsafe.Pointer) {
 	}
 	gbp.ReleasePointer(uintptr(ptr))
 	atomic.StoreUint32(&locker, 0)
-
 }
