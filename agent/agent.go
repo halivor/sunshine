@@ -96,9 +96,11 @@ func (a *Agent) parse() {
 	beg := 0
 	h := (*p.Header)(unsafe.Pointer(&a.buf[beg]))
 
-	for a.pos-beg > p.HLen || a.pos-beg >= p.HLen+h.Len() {
+	//a.Println("parse", a.pos, len(a.buf), cap(a.buf))
+	for a.pos-beg > p.HLen && a.pos-beg >= p.HLen+h.Len() {
 		//a.Println(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))
 		pd := p.Alloc(p.HLen + h.Len())
+		//a.Println("packet", p.HLen+h.Len(), beg, beg+p.HLen+h.Len())
 		copy(pd.Buf, a.buf[beg:beg+p.HLen+h.Len()])
 		a.Produce(m.T_TRANSFER, a.tqid, pd)
 

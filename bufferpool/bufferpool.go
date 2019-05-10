@@ -3,6 +3,8 @@ package bufferpool
 import (
 	_ "log"
 	"os"
+	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -32,8 +34,9 @@ var memCnt map[int]int = map[int]int{
 //   4096 * 4000     = 16M
 //   8192 * 2000     = 16M
 type bufferpool struct {
-	memCache map[int][]uintptr
-	memRef   map[uintptr]int
+	locker   uint32
+	memCache map[int][]unsafe.Pointer
+	memRef   map[unsafe.Pointer]int
 }
 
 var gpool [][]byte
@@ -44,8 +47,9 @@ func init() {
 
 func New() *bufferpool {
 	bp := &bufferpool{
-		memCache: make(map[int][]uintptr, 32),
-		memRef:   make(map[uintptr]int, 1024),
+		locker:   0,
+		memCache: make(map[int][]unsafe.Pointer, 128),
+		memRef:   make(map[unsafe.Pointer]int, 8192),
 	}
 	for size, num := range memCnt {
 		bp.memCache[size] = bp.allocMemory(size, num)
@@ -53,12 +57,12 @@ func New() *bufferpool {
 	return bp
 }
 
-func (bp *bufferpool) allocMemory(size, num int) []uintptr {
-	list := make([]uintptr, num, num*10)
+func (bp *bufferpool) allocMemory(size, num int) []unsafe.Pointer {
+	list := make([]unsafe.Pointer, num, num*10)
 	pool := make([]byte, size*num)
 	gpool = append(gpool, pool)
 	for pre, cur := 0, 1; cur-1 < num; pre, cur = cur*size, cur+1 {
-		list[cur-1] = uintptr(unsafe.Pointer(&pool[pre]))
+		list[cur-1] = unsafe.Pointer(&pool[pre])
 	}
 	return list
 }
@@ -68,19 +72,22 @@ func (bp *bufferpool) Alloc(length int) (buf []byte, e error) {
 	if e != nil {
 		return nil, e
 	}
-	size := bp.memRef[ptr]
-	buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(ptr))))[:size:size]
+	buf = (*((*[BUF_MAX_LEN]byte)(unsafe.Pointer(ptr))))[:length:length]
 	return buf, nil
 }
 
-func (bp *bufferpool) AllocPointer(length int) (p uintptr, e error) {
+func (bp *bufferpool) AllocPointer(length int) (p unsafe.Pointer, e error) {
+	defer atomic.StoreUint32(&bp.locker, 0)
+	for !atomic.CompareAndSwapUint32(&bp.locker, 0, 1) {
+		runtime.Gosched()
+	}
 	for i := 0; i < len(arrSize); i++ {
 		size := arrSize[i]
 		if length <= size {
 			if mc, ok := bp.memCache[size]; ok {
 				switch {
 				case len(mc) == 0:
-					return 0, os.ErrInvalid
+					return nil, os.ErrInvalid
 				case len(mc) == 1:
 					p = mc[0]
 					num := memCnt[size]
@@ -95,18 +102,22 @@ func (bp *bufferpool) AllocPointer(length int) (p uintptr, e error) {
 			}
 		}
 	}
-	return 0, os.ErrInvalid
+	return nil, os.ErrInvalid
 }
 
 func (bp *bufferpool) Release(buf []byte) {
-	bp.ReleasePointer(uintptr(unsafe.Pointer(&buf[0])))
+	bp.ReleasePointer(unsafe.Pointer(&buf[0]))
 }
 
-func (bp *bufferpool) ReleasePointer(ptr uintptr) {
+func (bp *bufferpool) ReleasePointer(ptr unsafe.Pointer) {
+	defer atomic.StoreUint32(&bp.locker, 0)
+	for !atomic.CompareAndSwapUint32(&bp.locker, 0, 1) {
+		runtime.Gosched()
+	}
 	if size, ok := bp.memRef[ptr]; ok {
 		bp.memCache[size] = append(bp.memCache[size], ptr)
 		if cap(bp.memCache[size])-len(bp.memCache[size]) < 64 {
-			list := make([]uintptr, 0, memCnt[size]*10)
+			list := make([]unsafe.Pointer, 0, memCnt[size]*10)
 			copy(list, bp.memCache[size])
 			bp.memCache[size] = list
 		}
