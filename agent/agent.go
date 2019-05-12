@@ -9,7 +9,7 @@ import (
 
 	ep "github.com/halivor/goevent/eventpool"
 	m "github.com/halivor/goevent/middleware"
-	bp "github.com/halivor/sunshine/bufferpool"
+	bp "github.com/halivor/goutility/bufferpool"
 	cnf "github.com/halivor/sunshine/config"
 	c "github.com/halivor/sunshine/connection"
 	p "github.com/halivor/sunshine/packet"

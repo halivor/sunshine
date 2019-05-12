@@ -5,7 +5,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	bp "github.com/halivor/sunshine/bufferpool"
+	bp "github.com/halivor/goutility/bufferpool"
 	cnf "github.com/halivor/sunshine/config"
 	pkt "github.com/halivor/sunshine/packet"
 )

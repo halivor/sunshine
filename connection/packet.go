@@ -3,7 +3,7 @@ package connection
 import (
 	"unsafe"
 
-	bp "github.com/halivor/sunshine/bufferpool"
+	bp "github.com/halivor/goutility/bufferpool"
 )
 
 type packet struct {

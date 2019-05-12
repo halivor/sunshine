@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	bp "github.com/halivor/sunshine/bufferpool"
+	bp "github.com/halivor/goutility/bufferpool"
 )
 
 const (

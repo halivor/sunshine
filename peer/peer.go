@@ -7,7 +7,7 @@ import (
 	"unsafe"
 
 	ep "github.com/halivor/goevent/eventpool"
-	bp "github.com/halivor/sunshine/bufferpool"
+	bp "github.com/halivor/goutility/bufferpool"
 	cnf "github.com/halivor/sunshine/config"
 	c "github.com/halivor/sunshine/connection"
 	pkt "github.com/halivor/sunshine/packet"
