@@ -5,8 +5,8 @@ import (
 	"log"
 	"syscall"
 
-	ep "github.com/halivor/goevent/eventpool"
-	m "github.com/halivor/goevent/middleware"
+	ep "github.com/halivor/goutility/eventpool"
+	m "github.com/halivor/goutility/middleware"
 	"github.com/halivor/sunshine/config"
 	c "github.com/halivor/sunshine/connection"
 	p "github.com/halivor/sunshine/peer"

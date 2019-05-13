@@ -11,7 +11,6 @@ const (
 	DEFAULT_BUFFER_SIZE = 32 * 1024
 )
 
-// TODO: connection nocache/connection buffercache
 type c struct {
 	fd int
 	ss SockStat

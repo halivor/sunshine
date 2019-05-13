@@ -3,7 +3,7 @@ package transfer
 import (
 	"log"
 
-	mw "github.com/halivor/goevent/middleware"
+	mw "github.com/halivor/goutility/middleware"
 	cnf "github.com/halivor/sunshine/config"
 )
 

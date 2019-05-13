@@ -4,7 +4,7 @@ import (
 	"log"
 	"unsafe"
 
-	mw "github.com/halivor/goevent/middleware"
+	mw "github.com/halivor/goutility/middleware"
 	cnf "github.com/halivor/sunshine/config"
 	pkt "github.com/halivor/sunshine/packet"
 )
@@ -45,7 +45,7 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 func (pm *manager) Add(p *Peer) {
 	// 超时重连
 	pm.peers[p] = struct{}{}
-	pm.Println("add", p.header.Uid)
+	//pm.Println("add", p.header.Uid)
 	if _, ok := pm.users[p.header.Uid]; !ok {
 		pm.users[p.header.Uid] = make(map[*Peer]struct{}, 16)
 	}

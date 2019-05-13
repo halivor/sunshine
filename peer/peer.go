@@ -6,8 +6,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	ep "github.com/halivor/goevent/eventpool"
 	bp "github.com/halivor/goutility/bufferpool"
+	ep "github.com/halivor/goutility/eventpool"
 	cnf "github.com/halivor/sunshine/config"
 	c "github.com/halivor/sunshine/connection"
 	pkt "github.com/halivor/sunshine/packet"
