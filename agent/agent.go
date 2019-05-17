@@ -96,6 +96,7 @@ func (a *Agent) parse() {
 	beg := 0
 	h := (*p.Header)(unsafe.Pointer(&a.buf[beg]))
 
+	// TODO: 如果是只有一个包，直接发送，不做copy
 	//a.Println("parse", a.pos, len(a.buf), cap(a.buf))
 	for a.pos-beg > p.HLen && a.pos-beg >= p.HLen+h.Len() {
 		//a.Println(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))

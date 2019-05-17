@@ -10,6 +10,7 @@ import (
 
 const (
 	STD_PKT_LEN = 1024
+	PKT_SIZE    = int(unsafe.Sizeof(P{}))
 )
 
 type P struct {
@@ -21,24 +22,26 @@ type P struct {
 }
 
 func NewPkt() *P {
-	buf := bp.Alloc(STD_PKT_LEN)
-	p := (*P)(unsafe.Pointer(&buf[0]))
+	ptr := bp.AllocPointer(STD_PKT_LEN)
+	p := (*P)(unsafe.Pointer(ptr))
 	p.Len = 0
-	p.Cap = cap(buf) - int(unsafe.Offsetof(p.ptr))
-	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
+	p.Cap = STD_PKT_LEN - PKT_SIZE
+	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(uintptr(ptr) + uintptr(PKT_SIZE))))[:p.Cap:p.Cap]
 	p.ref = 1
+	p.ptr = uintptr(ptr)
 	//log.Println("alloc  ", unsafe.Pointer(&buf[0]))
 	return p
 }
 
 func Alloc(length int) *P {
-	alen := length + int(unsafe.Sizeof(P{}))
-	buf := bp.Alloc(alen)
-	p := (*P)(unsafe.Pointer(&buf[0]))
-	p.Len = length
-	p.Cap = cap(buf) - int(unsafe.Offsetof(p.ptr))
-	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
+	alen := length + PKT_SIZE
+	ptr := bp.AllocPointer(alen)
+	p := (*P)(unsafe.Pointer(ptr))
+	p.Len = 0
+	p.Cap = alen - PKT_SIZE
+	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(uintptr(ptr) + uintptr(PKT_SIZE))))[:p.Cap:p.Cap]
 	p.ref = 1
+	p.ptr = uintptr(ptr)
 	//log.Println("alloc  ", unsafe.Pointer(&buf[0]))
 	return p
 }
@@ -47,14 +50,14 @@ func (p *P) Buffer() []byte {
 	return (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(&p.ptr)))[:p.Cap]
 }
 
-func (p *P) Refefence() *P {
+func (p *P) Reference() *P {
 	atomic.AddInt64(&p.ref, 1)
-	return p
+	np := *p
+	return &np
 }
 
 func (p *P) Release() {
 	if atomic.AddInt64(&p.ref, -1) == 0 {
-		//log.Println("release", unsafe.Pointer(p))
-		bp.Release((*(*[1]byte)(unsafe.Pointer(p)))[:])
+		bp.ReleasePointer(unsafe.Pointer(p.ptr))
 	}
 }

@@ -80,12 +80,12 @@ func (pm *manager) broadcast(cid uint32, pd *pkt.P) {
 	case cid > 0:
 		if r, ok := pm.rooms[cid]; ok {
 			for p, _ := range r {
-				p.Send(pd.Refefence())
+				p.Send(pd.Reference())
 			}
 		}
 	default:
 		for p, _ := range pm.peers {
-			p.Send(pd.Refefence())
+			p.Send(pd.Reference())
 		}
 	}
 	pd.Release()

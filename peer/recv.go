@@ -82,10 +82,10 @@ func (p *Peer) auth() (e error) {
 	// 转发packet消息
 	tlen := pkt.HLen + plen
 	tb := bp.Alloc(tlen)
+	defer bp.Release(tb)
 	*(*pkt.Header)(unsafe.Pointer(&tb[0])) = p.header
 	copy(tb[pkt.HLen:tlen], rp.Buf[:plen])
 	p.Transfer(tb[:tlen])
-	bp.Release(tb)
 
 	if rp.Len > plen {
 		copy(rp.Buf, rp.Buf[plen:rp.Len])
@@ -93,6 +93,8 @@ func (p *Peer) auth() (e error) {
 	rp.Len -= plen
 	return nil
 }
+
+// TODO: 只有一个包, 直接返回EAGAIN
 func (p *Peer) parse() (e error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -120,10 +122,10 @@ func (p *Peer) parse() (e error) {
 	default:
 		tlen := pkt.HLen + plen
 		tb := bp.Alloc(tlen)
+		defer bp.Release(tb)
 		*(*pkt.Header)(unsafe.Pointer(&tb[0])) = p.header
 		copy(tb[pkt.HLen:tlen], rp.Buf[:plen])
 		p.Transfer(tb)
-		bp.Release(tb)
 	}
 
 	if rp.Len > plen {
