@@ -37,7 +37,7 @@ func Alloc(length int) *P {
 	alen := length + PKT_SIZE
 	ptr := bp.AllocPointer(alen)
 	p := (*P)(unsafe.Pointer(ptr))
-	p.Len = 0
+	p.Len = length
 	p.Cap = alen - PKT_SIZE
 	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(uintptr(ptr) + uintptr(PKT_SIZE))))[:p.Cap:p.Cap]
 	p.ref = 1
