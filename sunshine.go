@@ -1,10 +1,10 @@
 package main
 
 import (
-	"log"
 	"sync"
 
 	ep "github.com/halivor/goutility/eventpool"
+	log "github.com/halivor/goutility/logger"
 	mw "github.com/halivor/goutility/middleware"
 	ac "github.com/halivor/sunshine/acceptor"
 	ag "github.com/halivor/sunshine/agent"
@@ -24,18 +24,19 @@ func main() {
 func newSun(laddr, raddr string) {
 	defer func() {
 		/*if r := recover(); r != nil {*/
-		//log.Println("panic =>", r)
+		//log.Warn("panic =>", r)
 		/*}*/
 		wg.Done()
 	}()
+	log.StdOutDebug()
 	eper := ep.New()
 	mws := mw.New()
 	if _, e := ac.NewTcpAcceptor(laddr, eper, mws); e != nil {
-		log.Println("new acceptor failed:", e)
+		log.Warn("new acceptor failed:", e)
 	}
 	// TODO:  multi agent/eventpool cause buffer pool crash
 	if _, e := ag.New(raddr, eper, mws); e != nil {
-		log.Println("new agent failed:", e)
+		log.Warn("new agent failed:", e)
 	}
 	eper.Run()
 }

@@ -1,13 +1,11 @@
 package acceptor
 
 import (
-	"fmt"
-	"log"
 	"syscall"
 
 	ep "github.com/halivor/goutility/eventpool"
+	log "github.com/halivor/goutility/logger"
 	m "github.com/halivor/goutility/middleware"
-	"github.com/halivor/sunshine/config"
 	c "github.com/halivor/sunshine/connection"
 	p "github.com/halivor/sunshine/peer"
 )
@@ -20,7 +18,7 @@ type Acceptor struct {
 	ep.EventPool // event: add, del, mod
 	p.Manager
 
-	*log.Logger
+	log.Logger
 }
 
 func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor, e error) {
@@ -37,7 +35,7 @@ func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor
 		return nil, e
 	}
 	if e := c.Reuse(C.Fd(), true); e != nil {
-		log.Println("reuse addr port failed,", e)
+		log.Warn("reuse addr port failed,", e)
 	}
 	if e = syscall.Bind(C.Fd(), saddr); e != nil {
 		return nil, e
@@ -46,13 +44,14 @@ func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor
 		return nil, e
 	}
 
+	logger, _ := log.New("/data/logs/sunshine/acceptor.log", "[accept]", log.LstdFlags, log.TRACE)
 	a = &Acceptor{
 		ev:        ep.EV_READ,
 		addr:      addr,
 		Conn:      C,
 		EventPool: epr,
 		Manager:   p.NewManager(mw),
-		Logger:    config.NewLogger(fmt.Sprintf("[accept(%d)] ", C.Fd())),
+		Logger:    logger,
 	}
 
 	return a, nil
@@ -60,7 +59,7 @@ func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor
 
 func (a *Acceptor) CallBack(ev ep.EP_EVENT) {
 	if ev&ep.EV_ERROR != 0 {
-		a.Println("epoll error", ev)
+		a.Warn("epoll error", ev)
 		a.DelEvent(a)
 		return
 	}
@@ -71,7 +70,7 @@ func (a *Acceptor) CallBack(ev ep.EP_EVENT) {
 		// ENFILE => The system limit on the total number of open files has been reached.
 		// ENOBUFS, ENOMEM => Not enough free memory. This often means that the memory allocation is limited by the socket buffer limits, not by the system memory.
 	case nil:
-		a.Println("accept connection", fd)
+		a.Debug("accept connection", fd)
 		a.AddEvent(p.New(c.NewConn(fd), a.EventPool, a.Manager))
 	default:
 		a.DelEvent(a)

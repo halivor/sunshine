@@ -2,7 +2,6 @@ package packet
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 )
 
@@ -19,7 +18,8 @@ type Auth struct {
 func (a *Auth) Ver() int {
 	v, e := strconv.Atoi(string(a.ver[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return v
 }
@@ -27,7 +27,8 @@ func (a *Auth) Ver() int {
 func (a *Auth) Uid() int {
 	u, e := strconv.Atoi(string(a.uid[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return u
 }
@@ -35,7 +36,8 @@ func (a *Auth) Uid() int {
 func (a *Auth) Cid() int {
 	c, e := strconv.Atoi(string(a.cid[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return c
 }
@@ -43,7 +45,8 @@ func (a *Auth) Cid() int {
 func (a *Auth) Sign() int {
 	s, e := strconv.Atoi(string(a.sign[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return s
 }
@@ -51,7 +54,8 @@ func (a *Auth) Sign() int {
 func (a *Auth) Len() int {
 	l, e := strconv.Atoi(string(a.len[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return l
 }

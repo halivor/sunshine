@@ -2,13 +2,12 @@ package peer
 
 import (
 	"fmt"
-	"log"
 	"syscall"
 	"unsafe"
 
 	bp "github.com/halivor/goutility/bufferpool"
 	ep "github.com/halivor/goutility/eventpool"
-	cnf "github.com/halivor/sunshine/config"
+	log "github.com/halivor/goutility/logger"
 	c "github.com/halivor/sunshine/connection"
 	pkt "github.com/halivor/sunshine/packet"
 )
@@ -23,10 +22,11 @@ type Peer struct {
 	Manager
 	c.Conn
 	ep.EventPool
-	*log.Logger
+	log.Logger
 }
 
 func New(conn c.Conn, epr ep.EventPool, pm Manager) *Peer {
+	logger, _ := log.New("/data/logs/sunshine/peer.log", fmt.Sprintf("[peer(%d)]", conn.Fd()), log.LstdFlags, log.TRACE)
 	return &Peer{
 		ev: ep.EV_READ,
 		ps: PS_ESTAB,
@@ -37,7 +37,7 @@ func New(conn c.Conn, epr ep.EventPool, pm Manager) *Peer {
 		Manager:   pm,
 		Conn:      conn,
 		EventPool: epr,
-		Logger:    cnf.NewLogger(fmt.Sprintf("[peer(%d)]", conn.Fd())),
+		Logger:    logger,
 	}
 }
 
@@ -52,7 +52,7 @@ func (p *Peer) CallBack(ev ep.EP_EVENT) {
 	case ev&ep.EV_WRITE != 0:
 		p.sendAgain()
 	default:
-		p.Println("event error", ev)
+		p.Warn("event error", ev)
 		p.Release()
 	}
 }

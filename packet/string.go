@@ -1,7 +1,6 @@
 package packet
 
 import (
-	"log"
 	"strconv"
 )
 
@@ -18,7 +17,8 @@ type SHeader struct {
 func (h *SHeader) Ver() int {
 	v, e := strconv.Atoi(string(h.ver[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return v
 }
@@ -30,7 +30,8 @@ func (h *SHeader) Opt() int {
 func (h *SHeader) Cmd() int {
 	c, e := strconv.Atoi(string(h.cmd[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return c
 }
@@ -38,7 +39,8 @@ func (h *SHeader) Cmd() int {
 func (h *SHeader) Seq() uint64 {
 	s, e := strconv.ParseUint(string(h.seq[:]), 10, 64)
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return s
 }
@@ -46,7 +48,8 @@ func (h *SHeader) Seq() uint64 {
 func (h *SHeader) Len() int {
 	l, e := strconv.Atoi(string(h.len[:]))
 	if e != nil {
-		log.Panicln(e)
+		pl.Warn(e)
+		panic(e)
 	}
 	return l
 }

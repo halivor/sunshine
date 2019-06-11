@@ -2,15 +2,14 @@ package agent
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"syscall"
 	"unsafe"
 
 	bp "github.com/halivor/goutility/bufferpool"
 	ep "github.com/halivor/goutility/eventpool"
+	log "github.com/halivor/goutility/logger"
 	m "github.com/halivor/goutility/middleware"
-	cnf "github.com/halivor/sunshine/config"
 	c "github.com/halivor/sunshine/connection"
 	p "github.com/halivor/sunshine/packet"
 )
@@ -25,14 +24,14 @@ type Agent struct {
 	ep.EventPool
 	tqid m.QId
 	m.Middleware
-	*log.Logger
+	log.Logger
 }
 
 func New(addr string, epr ep.EventPool, mw m.Middleware) (a *Agent, e error) {
 	defer func() {
 		if e == nil {
 			if e = a.AddEvent(a); e != nil {
-				a.Println("add event failed:", e)
+				a.Warn("add event failed:", e)
 				return
 			}
 			a.tqid = a.Bind(m.T_TRANSFER, "down", m.A_PRODUCE, a)
@@ -56,6 +55,7 @@ func New(addr string, epr ep.EventPool, mw m.Middleware) (a *Agent, e error) {
 	}
 
 	buf := bp.Alloc(2048)
+	logger, _ := log.New("/data/logs/sunshine/agent.log", fmt.Sprintf("[agent(%d)]", C.Fd()), log.LstdFlags, log.TRACE)
 	return &Agent{
 		ev:         ep.EV_READ,
 		addr:       addr,
@@ -63,7 +63,7 @@ func New(addr string, epr ep.EventPool, mw m.Middleware) (a *Agent, e error) {
 		Conn:       C,
 		EventPool:  epr,
 		Middleware: mw,
-		Logger:     cnf.NewLogger(fmt.Sprintf("[agent(%d)]", C.Fd())),
+		Logger:     logger,
 	}, nil
 }
 
@@ -97,11 +97,11 @@ func (a *Agent) parse() {
 	h := (*p.Header)(unsafe.Pointer(&a.buf[beg]))
 
 	// TODO: 如果是只有一个包，直接发送，不做copy
-	//a.Println("parse", a.pos, len(a.buf), cap(a.buf))
+	//a.Trace("parse", a.pos, len(a.buf), cap(a.buf))
 	for a.pos-beg > p.HLen && a.pos-beg >= p.HLen+h.Len() {
-		//a.Println(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))
+		//a.Trace(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))
 		pd := p.Alloc(p.HLen + h.Len())
-		//a.Println("packet", p.HLen+h.Len(), beg, beg+p.HLen+h.Len())
+		//a.Trace("packet", p.HLen+h.Len(), beg, beg+p.HLen+h.Len())
 		copy(pd.Buf, a.buf[beg:beg+p.HLen+h.Len()])
 		a.Produce(m.T_TRANSFER, a.tqid, pd)
 

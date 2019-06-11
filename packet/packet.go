@@ -1,7 +1,6 @@
 package packet
 
 import (
-	_ "log"
 	"sync/atomic"
 	"unsafe"
 
@@ -29,7 +28,7 @@ func NewPkt() *P {
 	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(uintptr(ptr) + uintptr(PKT_SIZE))))[:p.Cap:p.Cap]
 	p.ref = 1
 	p.ptr = uintptr(ptr)
-	//log.Println("alloc  ", unsafe.Pointer(&buf[0]))
+	//pl.Trace("alloc  ", unsafe.Pointer(&buf[0]))
 	return p
 }
 
@@ -42,7 +41,7 @@ func Alloc(length int) *P {
 	p.Buf = (*(*[bp.BUF_MAX_LEN]byte)(unsafe.Pointer(uintptr(ptr) + uintptr(PKT_SIZE))))[:p.Cap:p.Cap]
 	p.ref = 1
 	p.ptr = uintptr(ptr)
-	//log.Println("alloc  ", unsafe.Pointer(&buf[0]))
+	//pl.Trace("alloc  ", unsafe.Pointer(&buf[0]))
 	return p
 }
 

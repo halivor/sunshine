@@ -14,7 +14,7 @@ func (p *Peer) recv() error {
 	for {
 		switch n, e := syscall.Read(p.Fd(), p.rp.Buf[p.rp.Len:]); {
 		case e != nil:
-			p.Println("read", e)
+			p.Warn("read", e)
 			return e
 		case n == 0:
 			return os.ErrClosed
@@ -34,9 +34,9 @@ func (p *Peer) process() error {
 	for {
 		switch p.ps {
 		case PS_ESTAB:
-			//p.Println("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
+			//p.Trace("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
 			if e := p.auth(); e != nil {
-				p.Println("auth", e)
+				p.Warn("auth", e)
 				return e
 			}
 			p.Send(pkt.AuthSucc)
@@ -44,12 +44,12 @@ func (p *Peer) process() error {
 			if p.rp.Len < pkt.HLen {
 				return syscall.EAGAIN
 			}
-			//p.Println("normal", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
+			//p.Trace("normal", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
 			if e := p.parse(); e != nil {
 				return e
 			}
 		default:
-			p.Println("unknown status")
+			p.Warn("unknown status", p.ps)
 			return os.ErrInvalid
 		}
 	}
@@ -59,7 +59,7 @@ func (p *Peer) auth() (e error) {
 	defer func() {
 		switch r := recover(); {
 		case r != nil:
-			p.Println("check =>", r)
+			p.Warn("check =>", r)
 			e = os.ErrInvalid
 		case e == nil:
 			p.Add(p)
@@ -98,7 +98,7 @@ func (p *Peer) auth() (e error) {
 func (p *Peer) parse() (e error) {
 	defer func() {
 		if r := recover(); r != nil {
-			p.Println("parse =>", r)
+			p.Warn("parse =>", r)
 			e = os.ErrInvalid
 		}
 	}()

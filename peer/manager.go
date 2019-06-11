@@ -1,11 +1,10 @@
 package peer
 
 import (
-	"log"
 	"unsafe"
 
+	log "github.com/halivor/goutility/logger"
 	mw "github.com/halivor/goutility/middleware"
-	cnf "github.com/halivor/sunshine/config"
 	pkt "github.com/halivor/sunshine/packet"
 )
 
@@ -23,7 +22,7 @@ type manager struct {
 	uqid  mw.QId
 
 	mw.Middleware
-	*log.Logger
+	log.Logger
 }
 
 func NewManager(mdw mw.Middleware) (pm *manager) {
@@ -31,12 +30,13 @@ func NewManager(mdw mw.Middleware) (pm *manager) {
 		pm.uqid = pm.Bind(mw.T_TRANSFER, "up", mw.A_PRODUCE, pm)
 		pm.Bind(mw.T_TRANSFER, "down", mw.A_CONSUME, pm)
 	}()
+	logger, _ := log.New("/data/logs/sunshine/peer.log", "[mgr]", log.LstdFlags, log.TRACE)
 	return &manager{
 		peers:      make(map[*Peer]struct{}, 1024),
 		users:      make(map[uint32]map[*Peer]struct{}, 1024),
 		rooms:      make(map[uint32]map[*Peer]struct{}, 1024),
 		Middleware: mdw,
-		Logger:     cnf.NewLogger("[pm] "),
+		Logger:     logger,
 	}
 }
 
