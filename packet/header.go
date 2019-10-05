@@ -2,6 +2,8 @@ package packet
 
 import (
 	"unsafe"
+
+	cp "common/golang/packet"
 )
 
 type Type int8
@@ -18,7 +20,7 @@ type Header struct {
 	Nid uint16 // node id
 	Uid uint32 // user id
 	Cid uint32 // user type
-	Cmd CmdID
+	Cmd cp.CmdID
 	len uint32
 	Res [12]byte
 }
@@ -31,11 +33,12 @@ func (h *Header) SetLen(len uint32) {
 }
 
 type UHeader interface {
-	Ver() int
-	Opt() int
-	Cmd() int
-	Seq() uint64
-	Len() int
+	IVer() int
+	IOpt() int
+	ICmd() cp.CmdID
+	UISeq() uint64
+	ILen() int
+	String() string
 }
 
 const (
@@ -51,6 +54,6 @@ func Parse(pb []byte) UHeader {
 	case 'S':
 		return (*SHeader)(unsafe.Pointer(&pb[0]))
 	}
-	panic("undefined head type")
+	plog.Panic("undefined head type")
 	return nil
 }

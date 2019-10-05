@@ -2,54 +2,57 @@ package packet
 
 import (
 	"strconv"
+	"unsafe"
+
+	cp "common/golang/packet"
 )
 
 type SHeader struct {
-	ver [2]byte
-	typ uint8
-	opt uint8
-	cmd [4]byte
-	seq [8]byte
-	len [4]byte
-	res [8]byte
+	Ver [2]byte
+	Typ uint8
+	Opt uint8
+	Cmd [4]byte
+	Seq [8]byte
+	Len [4]byte
+	Res [8]byte
 }
 
-func (h *SHeader) Ver() int {
-	v, e := strconv.Atoi(string(h.ver[:]))
+func (h *SHeader) IVer() int {
+	v, e := strconv.Atoi(string(h.Ver[:]))
 	if e != nil {
-		pl.Warn(e)
-		panic(e)
+		plog.Panic(e)
 	}
 	return v
 }
 
-func (h *SHeader) Opt() int {
-	return int(h.opt)
+func (h *SHeader) IOpt() int {
+	return int(h.Opt)
 }
 
-func (h *SHeader) Cmd() int {
-	c, e := strconv.Atoi(string(h.cmd[:]))
+func (h *SHeader) ICmd() cp.CmdID {
+	c, e := strconv.Atoi(string(h.Cmd[:]))
 	if e != nil {
-		pl.Warn(e)
-		panic(e)
+		plog.Panic(e)
 	}
-	return c
+	return cp.CmdID(c)
 }
 
-func (h *SHeader) Seq() uint64 {
-	s, e := strconv.ParseUint(string(h.seq[:]), 10, 64)
+func (h *SHeader) UISeq() uint64 {
+	s, e := strconv.ParseUint(string(h.Seq[:]), 10, 64)
 	if e != nil {
-		pl.Warn(e)
-		panic(e)
+		plog.Panic(e)
 	}
 	return s
 }
 
-func (h *SHeader) Len() int {
-	l, e := strconv.Atoi(string(h.len[:]))
+func (h *SHeader) ILen() int {
+	l, e := strconv.Atoi(string(h.Len[:]))
 	if e != nil {
-		pl.Warn(e)
-		panic(e)
+		plog.Panic(e)
 	}
 	return l
+}
+
+func (h *SHeader) String() string {
+	return string((*(*[HLen]byte)(unsafe.Pointer(h)))[:HLen:HLen])
 }

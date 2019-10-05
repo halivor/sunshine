@@ -10,6 +10,7 @@ import (
 	ep "github.com/halivor/goutility/eventpool"
 	log "github.com/halivor/goutility/logger"
 	m "github.com/halivor/goutility/middleware"
+	sc "github.com/halivor/sunshine/conf"
 	c "github.com/halivor/sunshine/connection"
 	p "github.com/halivor/sunshine/packet"
 )
@@ -20,51 +21,47 @@ type Agent struct {
 	buf  []byte
 	pos  int
 
+	mwTfs m.MwId
+	tqid  m.QId
+
 	c.Conn
 	ep.EventPool
-	tqid m.QId
 	m.Middleware
 	log.Logger
 }
 
-func New(addr string, epr ep.EventPool, mw m.Middleware) (a *Agent, e error) {
-	defer func() {
-		if e == nil {
-			if e = a.AddEvent(a); e != nil {
-				a.Warn("add event failed:", e)
-				return
-			}
-			a.tqid = a.Bind(m.T_TRANSFER, "down", m.A_PRODUCE, a)
-			a.Bind(m.T_TRANSFER, "up", m.A_CONSUME, a)
-		}
-	}()
-
+func New(addr string, epr ep.EventPool, mw m.Middleware) *Agent {
 	C, e := c.NewTcpConn()
 	if e != nil {
-		return nil, e
+		panic(e)
 	}
 	ad, e := net.ResolveTCPAddr("tcp", addr)
 	if e != nil {
-		return nil, e
+		panic(e)
 	}
 	saddr := &syscall.SockaddrInet4{Port: ad.Port}
 	copy(saddr.Addr[:], ad.IP.To4())
 
 	if e = syscall.Connect(C.Fd(), saddr); e != nil {
-		return nil, e
+		panic(e)
 	}
 
-	buf := bp.Alloc(2048)
-	logger, _ := log.New("/data/logs/sunshine/agent.log", fmt.Sprintf("[agent(%d)]", C.Fd()), log.LstdFlags, log.TRACE)
-	return &Agent{
+	a := &Agent{
 		ev:         ep.EV_READ,
 		addr:       addr,
-		buf:        buf,
+		buf:        bp.Alloc(4096 - 96),
 		Conn:       C,
 		EventPool:  epr,
 		Middleware: mw,
-		Logger:     logger,
-	}, nil
+		Logger: log.NewLog("sunshine.log",
+			fmt.Sprintf("[agent(%d)]", C.Fd()), log.LstdFlags, sc.LogLvlAgent),
+	}
+
+	if e = a.AddEvent(a); e != nil {
+		panic(e)
+	}
+
+	return a
 }
 
 func (a *Agent) CallBack(ev ep.EP_EVENT) {
@@ -101,9 +98,10 @@ func (a *Agent) parse() {
 	for a.pos-beg > p.HLen && a.pos-beg >= p.HLen+h.Len() {
 		//a.Trace(h.Cmd, string(a.buf[beg+p.HLen:beg+p.HLen+h.Len()]))
 		pd := p.Alloc(p.HLen + h.Len())
-		//a.Trace("packet", p.HLen+h.Len(), beg, beg+p.HLen+h.Len())
 		copy(pd.Buf, a.buf[beg:beg+p.HLen+h.Len()])
-		a.Produce(m.T_TRANSFER, a.tqid, pd)
+		a.Trace("parse", p.HLen+h.Len(), string(pd.Buf[p.HLen:]))
+		a.Produce(a.mwTfs, a.tqid, pd)
+		//pd.Release()
 
 		beg += p.HLen + h.Len()
 		h = (*p.Header)(unsafe.Pointer(&a.buf[beg]))
@@ -113,6 +111,12 @@ func (a *Agent) parse() {
 		copy(a.buf, a.buf[beg:a.pos])
 	}
 	a.pos -= beg
+}
+
+func (a *Agent) BindMsg(id m.MwId) {
+	a.mwTfs = id
+	a.tqid = a.Bind(id, "down", m.A_PRODUCE, a)
+	a.Bind(id, "up", m.A_CONSUME, a)
 }
 
 func (a *Agent) Consume(message interface{}) interface{} {
@@ -130,7 +134,7 @@ func (a *Agent) Event() ep.EP_EVENT {
 }
 
 func (a *Agent) Release() {
-	bp.Release(a.buf)
+	bp.Free(a.buf)
 	a.DelEvent(a)
 	a.Conn.Close()
 }

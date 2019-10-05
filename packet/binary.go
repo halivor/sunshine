@@ -1,5 +1,11 @@
 package packet
 
+import (
+	"fmt"
+
+	cp "common/golang/packet"
+)
+
 type BHeader struct {
 	ver uint16
 	typ uint8
@@ -10,22 +16,26 @@ type BHeader struct {
 	res uint64
 }
 
-func (h *BHeader) Ver() int {
+func (h *BHeader) IVer() int {
 	return int(h.ver)
 }
 
-func (h *BHeader) Opt() int {
+func (h *BHeader) IOpt() int {
 	return int(h.opt)
 }
 
-func (h *BHeader) Cmd() int {
-	return int(h.cmd)
+func (h *BHeader) ICmd() cp.CmdID {
+	return cp.CmdID(h.cmd)
 }
 
-func (h *BHeader) Seq() uint64 {
+func (h *BHeader) UISeq() uint64 {
 	return h.seq
 }
 
-func (h *BHeader) Len() int {
+func (h *BHeader) ILen() int {
 	return int(h.len)
+}
+
+func (h *BHeader) String() string {
+	return fmt.Sprintf("")
 }

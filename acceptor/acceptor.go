@@ -5,7 +5,7 @@ import (
 
 	ep "github.com/halivor/goutility/eventpool"
 	log "github.com/halivor/goutility/logger"
-	m "github.com/halivor/goutility/middleware"
+	sc "github.com/halivor/sunshine/conf"
 	c "github.com/halivor/sunshine/connection"
 	p "github.com/halivor/sunshine/peer"
 )
@@ -21,40 +21,36 @@ type Acceptor struct {
 	log.Logger
 }
 
-func NewTcpAcceptor(addr string, epr ep.EventPool, mw m.Middleware) (a *Acceptor, e error) {
-	defer func() {
-		a.AddEvent(a)
-	}()
-
+func NewTcpAcceptor(addr string, epr ep.EventPool, mgr p.Manager) *Acceptor {
 	C, e := c.NewTcpConn()
 	if e != nil {
-		return nil, e
+		panic(e)
 	}
 	saddr, e := c.ParseAddr4("tcp", addr)
 	if e != nil {
-		return nil, e
+		panic(e)
 	}
 	if e := c.Reuse(C.Fd(), true); e != nil {
 		log.Warn("reuse addr port failed,", e)
 	}
 	if e = syscall.Bind(C.Fd(), saddr); e != nil {
-		return nil, e
+		panic(e)
 	}
 	if e = syscall.Listen(C.Fd(), 1024); e != nil {
-		return nil, e
+		panic(e)
 	}
 
-	logger, _ := log.New("/data/logs/sunshine/acceptor.log", "[accept]", log.LstdFlags, log.TRACE)
-	a = &Acceptor{
+	a := &Acceptor{
 		ev:        ep.EV_READ,
 		addr:      addr,
 		Conn:      C,
 		EventPool: epr,
-		Manager:   p.NewManager(mw),
-		Logger:    logger,
+		Manager:   mgr,
+		Logger:    log.NewLog("sunsine.log", "[ac]", log.LstdFlags, sc.LogLvlAccept),
 	}
+	a.AddEvent(a)
 
-	return a, nil
+	return a
 }
 
 func (a *Acceptor) CallBack(ev ep.EP_EVENT) {
@@ -70,7 +66,7 @@ func (a *Acceptor) CallBack(ev ep.EP_EVENT) {
 		// ENFILE => The system limit on the total number of open files has been reached.
 		// ENOBUFS, ENOMEM => Not enough free memory. This often means that the memory allocation is limited by the socket buffer limits, not by the system memory.
 	case nil:
-		a.Debug("accept connection", fd)
+		a.Debug("new peer", fd)
 		a.AddEvent(p.New(c.NewConn(fd), a.EventPool, a.Manager))
 	default:
 		a.DelEvent(a)

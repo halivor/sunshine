@@ -5,6 +5,7 @@ import (
 	"syscall"
 
 	log "github.com/halivor/goutility/logger"
+	sc "github.com/halivor/sunshine/conf"
 )
 
 type Conn interface {
@@ -17,11 +18,12 @@ type Conn interface {
 func NewConn(fd int) Conn {
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
-	logger, _ := log.New("/data/logs/sunshine/c.log", fmt.Sprintf("[sock(%d)]", fd), log.LstdFlags, log.TRACE)
+
 	return &c{
-		fd:     fd,
-		ss:     ESTAB,
-		Logger: logger,
+		fd: fd,
+		ss: ESTAB,
+		Logger: log.NewLog("sunshine.log", fmt.Sprintf("[sock(%d)]", fd),
+			log.LstdFlags, sc.LogLvlConn),
 	}
 }
 
@@ -32,10 +34,10 @@ func NewTcpConn() (*c, error) {
 	}
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
-	logger, _ := log.New("/data/logs/sunshine/c.log", fmt.Sprintf("[tcp(%d)]", fd), log.LstdFlags, log.TRACE)
 	return &c{
-		fd:     fd,
-		ss:     CREATE,
-		Logger: logger,
+		fd: fd,
+		ss: CREATE,
+		Logger: log.NewLog("sunshine.log", fmt.Sprintf("[tcp(%d)]", fd),
+			log.LstdFlags, sc.LogLvlConn),
 	}, nil
 }

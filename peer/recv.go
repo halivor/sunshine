@@ -1,13 +1,15 @@
 package peer
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
 
+	cp "common/golang/packet"
 	bp "github.com/halivor/goutility/bufferpool"
-	cnf "github.com/halivor/sunshine/config"
-	pkt "github.com/halivor/sunshine/packet"
+	cnf "github.com/halivor/sunshine/conf"
+	up "github.com/halivor/sunshine/packet"
 )
 
 func (p *Peer) recv() error {
@@ -32,22 +34,24 @@ func (p *Peer) recv() error {
 
 func (p *Peer) process() error {
 	for {
-		switch p.ps {
-		case PS_ESTAB:
-			//p.Trace("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
+		switch {
+		case p.ps == PS_NORMAL && p.rp.Len < up.SHLen:
+			return syscall.EAGAIN
+		case p.ps == PS_NORMAL:
+			if e := p.parse(); e != nil {
+				return e
+			}
+		case p.ps == PS_ESTAB && p.rp.Len < up.ALen:
+			return syscall.EAGAIN
+		case p.ps == PS_ESTAB:
+			p.Trace("estab", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
 			if e := p.auth(); e != nil {
 				p.Warn("auth", e)
 				return e
 			}
-			p.Send(pkt.AuthSucc)
-		case PS_NORMAL:
-			if p.rp.Len < pkt.HLen {
-				return syscall.EAGAIN
-			}
-			//p.Trace("normal", p.rp.Len, string(p.rp.Buf[:p.rp.Len]))
-			if e := p.parse(); e != nil {
-				return e
-			}
+			p.SetPrefix(fmt.Sprintf("[p(%d)u(%d)]", p.Fd(), p.header.Uid))
+			p.Trace("auth success")
+			p.Send(up.AuthSucc)
 		default:
 			p.Warn("unknown status", p.ps)
 			return os.ErrInvalid
@@ -57,18 +61,15 @@ func (p *Peer) process() error {
 }
 func (p *Peer) auth() (e error) {
 	defer func() {
-		switch r := recover(); {
-		case r != nil:
+		if r := recover(); r != nil {
 			p.Warn("check =>", r)
 			e = os.ErrInvalid
-		case e == nil:
-			p.Add(p)
 		}
 	}()
 	rp := p.rp
-	a := (*pkt.Auth)(unsafe.Pointer(&rp.Buf[0]))
-	plen := pkt.ALen + a.Len()
-	if rp.Len < pkt.ALen || rp.Len < plen {
+	a := (*up.Auth)(unsafe.Pointer(&rp.Buf[0]))
+	plen := up.ALen + a.Len()
+	if rp.Len < plen {
 		return syscall.EAGAIN
 	}
 
@@ -77,15 +78,15 @@ func (p *Peer) auth() (e error) {
 	p.header.Uid = uint32(a.Uid())
 	p.header.Cid = uint32(a.Cid())
 	p.ps = PS_NORMAL
-	// verify failed os.ErrInvalid
+	p.AddPeer(p)
 
 	// 转发packet消息
-	tlen := pkt.HLen + plen
+	tlen := up.HLen + plen
 	tb := bp.Alloc(tlen)
-	*(*pkt.Header)(unsafe.Pointer(&tb[0])) = p.header
-	copy(tb[pkt.HLen:tlen], rp.Buf[:plen])
+	*(*up.Header)(unsafe.Pointer(&tb[0])) = p.header
+	copy(tb[up.HLen:tlen], rp.Buf[:plen])
 	p.Transfer(tb[:tlen])
-	bp.Release(tb)
+	bp.Free(tb)
 
 	if rp.Len > plen {
 		copy(rp.Buf, rp.Buf[plen:rp.Len])
@@ -104,28 +105,28 @@ func (p *Peer) parse() (e error) {
 	}()
 	rp := p.rp
 	// 用户包长度校验
-	uh := pkt.Parse(rp.Buf)
-	plen := pkt.SHLen + uh.Len()
-	if rp.Len < pkt.SHLen {
-		return syscall.EAGAIN
-	}
-	if uh.Len() > 4*1024 {
+	uh := up.Parse(rp.Buf)
+	if uh.ILen() > 4*1024 {
 		return os.ErrInvalid
 	}
 
-	p.header.Cmd = pkt.CmdID(uh.Cmd())
-	p.header.SetLen(uint32(pkt.SHLen + uh.Len()))
+	plen := up.SHLen + uh.ILen()
+	p.header.Cmd = uh.ICmd()
+	p.header.SetLen(uint32(plen))
 
 	switch p.header.Cmd {
-	case pkt.C_PING:
-		p.Send(pkt.Pong)
+	case cp.C_PING:
+		p.Trace("ping/pong...")
+		p.GenSeq(up.Pong)
+		p.Send(up.Pong)
 	default:
-		tlen := pkt.HLen + plen
+		tlen := up.HLen + plen
 		tb := bp.Alloc(tlen)
-		defer bp.Release(tb)
-		*(*pkt.Header)(unsafe.Pointer(&tb[0])) = p.header
-		copy(tb[pkt.HLen:tlen], rp.Buf[:plen])
+		*(*up.Header)(unsafe.Pointer(&tb[0])) = p.header
+		copy(tb[up.HLen:tlen], rp.Buf[:plen])
+		p.Trace("recv", string(tb[up.HLen:tlen]))
 		p.Transfer(tb)
+		bp.Free(tb)
 	}
 
 	if rp.Len > plen {

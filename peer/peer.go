@@ -3,22 +3,21 @@ package peer
 import (
 	"fmt"
 	"syscall"
-	"unsafe"
 
-	bp "github.com/halivor/goutility/bufferpool"
 	ep "github.com/halivor/goutility/eventpool"
 	log "github.com/halivor/goutility/logger"
+	sc "github.com/halivor/sunshine/conf"
 	c "github.com/halivor/sunshine/connection"
-	pkt "github.com/halivor/sunshine/packet"
+	up "github.com/halivor/sunshine/packet"
 )
 
 type Peer struct {
 	ev     ep.EP_EVENT
 	ps     peerStat
-	rp     *pkt.P   // read  buffer
-	wl     []*pkt.P // write buffer list
-	wp     int      // previous packet write position
-	header pkt.Header
+	rp     *up.P   // read  buffer
+	wl     []*up.P // write buffer list
+	wp     int     // previous packet write position
+	header up.Header
 	Manager
 	c.Conn
 	ep.EventPool
@@ -26,18 +25,18 @@ type Peer struct {
 }
 
 func New(conn c.Conn, epr ep.EventPool, pm Manager) *Peer {
-	logger, _ := log.New("/data/logs/sunshine/peer.log", fmt.Sprintf("[peer(%d)]", conn.Fd()), log.LstdFlags, log.TRACE)
 	return &Peer{
 		ev: ep.EV_READ,
 		ps: PS_ESTAB,
-		rp: pkt.NewPkt(),
-		wl: make([]*pkt.P, 0, 1024),
+		rp: up.NewPkt(),
+		wl: make([]*up.P, 0, 1024),
 		wp: 0,
 
 		Manager:   pm,
 		Conn:      conn,
 		EventPool: epr,
-		Logger:    logger,
+		Logger: log.NewLog("sunshine.peer.log",
+			fmt.Sprintf("[p(%d)]", conn.Fd()), log.LstdFlags, sc.LogLvlPeer),
 	}
 }
 
@@ -57,30 +56,32 @@ func (p *Peer) CallBack(ev ep.EP_EVENT) {
 	}
 }
 
-func (p *Peer) Send(pd *pkt.P) {
+func (p *Peer) Send(pd *up.P) {
 	if len(p.wl) > 0 {
 		switch {
-		case len(p.wl) > 128:
+		case len(p.wl) > MAX_QUEUE_SIZE:
 			p.Release()
 		default:
 			p.wl = append(p.wl, pd)
 		}
 		return
 	}
-	switch n, e := p.Conn.Send(pd.Buf[:pd.Len]); {
-	case e == nil || e == syscall.EAGAIN:
+	switch n, e := p.Conn.Send(pd.Buf); e {
+	case nil, syscall.EAGAIN:
 		if n < 0 {
 			n = 0
 		}
-		if n < pd.Len {
+		switch {
+		case n < pd.Len:
 			// 本次写入，导致socket write buffer满，剩余数据send again
 			// 网络正常时，不会出现此情况
 			p.wl = append(p.wl, pd)
-			p.wp += n
+			p.wp = n
 
 			p.ev |= ep.EV_WRITE
 			p.ModEvent(p)
-		} else {
+		default:
+			p.Trace("send", string(pd.Buf))
 			pd.Release()
 		}
 	default:
@@ -96,6 +97,7 @@ func (p *Peer) sendAgain() {
 			case n+p.wp == p.wl[0].Len:
 				// 本次写入完成后，socket write buffer未满时
 				// 本次会写入Buf中全部数据，同时e=nil
+				p.wl[0].Release()
 				p.wl = p.wl[1:]
 				p.wp = 0
 			case n+p.wp < p.wl[0].Len:
@@ -109,8 +111,8 @@ func (p *Peer) sendAgain() {
 			// 当本次写入时，本方buffer已满时，e=11，n=-1
 			if n > 0 {
 				// 没遇到过这种情况，防止意外
-				p.wp += n
-				if p.wp == p.wl[0].Len {
+				if p.wp += n; p.wp == p.wl[0].Len {
+					p.wl[0].Release()
 					p.wl = p.wl[1:]
 					p.wp = 0
 				}
@@ -130,10 +132,12 @@ func (p *Peer) Event() ep.EP_EVENT {
 }
 
 func (p *Peer) Release() {
+	p.Debug("release fd", p.Fd(), ", uid", p.header.Uid)
 	for _, ps := range p.wl {
-		bp.ReleasePointer(unsafe.Pointer(ps))
+		ps.Release()
 	}
 	syscall.Close(p.Fd())
 	p.DelEvent(p)
-	p.Del(p)
+	p.DelPeer(p)
+	log.Release(p.Logger)
 }

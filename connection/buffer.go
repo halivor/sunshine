@@ -5,6 +5,7 @@ import (
 	"syscall"
 
 	log "github.com/halivor/goutility/logger"
+	sc "github.com/halivor/sunshine/conf"
 )
 
 type buffer interface {
@@ -25,12 +26,12 @@ func NewConnWithBuffer(fd int) BConn {
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
 
-	logger, _ := log.New("/data/logs/sunshine/c.log", fmt.Sprintf("[sock(%d)]", fd), log.LstdFlags, log.TRACE)
 	return &c{
-		fd:     fd,
-		ss:     ESTAB,
-		wb:     make([]buffer, 0, MAX_SENDQ_SIZE),
-		Logger: logger,
+		fd: fd,
+		ss: ESTAB,
+		wb: make([]buffer, 0, MAX_SENDQ_SIZE),
+		Logger: log.NewLog("sunshine.log", fmt.Sprintf("[sock(%d)b]", fd),
+			log.LstdFlags, sc.LogLvlConn),
 	}
 }
 
@@ -42,11 +43,11 @@ func NewTcpConnWithBuffer() (*c, error) {
 	SetSndBuf(fd, DEFAULT_BUFFER_SIZE)
 	SetRcvBuf(fd, DEFAULT_BUFFER_SIZE)
 
-	logger, _ := log.New("/data/logs/sunshine/c.log", fmt.Sprintf("[tcp(%d)]", fd), log.LstdFlags, log.TRACE)
 	return &c{
-		fd:     fd,
-		ss:     CREATE,
-		wb:     make([]buffer, 0, MAX_SENDQ_SIZE),
-		Logger: logger,
+		fd: fd,
+		ss: CREATE,
+		wb: make([]buffer, 0, MAX_SENDQ_SIZE),
+		Logger: log.NewLog("sunshine.log", fmt.Sprintf("[tcp(%d)b]", fd),
+			log.LstdFlags, sc.LogLvlConn),
 	}, nil
 }

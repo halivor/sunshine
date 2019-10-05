@@ -8,3 +8,11 @@ const (
 	PS_NORMAL
 	PS_END
 )
+
+const (
+	MAX_QUEUE_SIZE = 256
+)
+
+var (
+	gSeq int32 = 10 * 1000 * 1000
+)
